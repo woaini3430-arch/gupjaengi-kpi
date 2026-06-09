@@ -87,6 +87,12 @@
   .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 20px;border-radius:24px;font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:.25s}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   .hide{display:none}
+  .modal{position:fixed;inset:0;background:rgba(20,18,14,.45);z-index:60;padding:24px 14px;overflow:auto}
+  .modal:not(.hide){display:flex;align-items:flex-start;justify-content:center}
+  .modal .box{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;max-width:580px;width:100%;box-shadow:0 14px 50px rgba(0,0,0,.25)}
+  .modal .box h2{font-family:var(--disp);font-size:16px;margin:0 0 4px}
+  .modal .mhead{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px}
+  .modal .mhead .x{border:none;background:none;font-size:22px;color:var(--muted);cursor:pointer;line-height:1}
   .chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
   .chip{border:1px solid var(--line);background:#fff;border-radius:20px;padding:7px 16px;font-weight:600;font-size:13px;cursor:pointer;color:var(--muted);font-family:var(--kr)}
   .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
@@ -203,8 +209,11 @@
         </div>
       </div>
     </div>
-    <div class="chips" id="crmChips" style="margin-bottom:0;padding:2px 2px 14px"></div>
-    <div class="panel"><div class="ptitle">고객 목록 (줄을 누르면 수정)</div><div class="tscroll"><table id="crmTable"></table></div></div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:2px 2px 14px">
+      <div class="chips" id="crmChips" style="margin:0"></div>
+      <select id="crmMonth" style="max-width:160px;margin-left:auto"></select>
+    </div>
+    <div class="panel"><div class="ptitle">고객 목록 (줄을 누르면 바로 수정)</div><div class="tscroll"><table id="crmTable"></table></div></div>
   </div>
 
   <!-- ============ 담당자 ============ -->
@@ -263,6 +272,35 @@
     <div class="panel"><div class="ptitle">수정 기록 <span style="font-weight:600;color:var(--muted)">· 최근 300건 (최신이 위)</span></div><div class="tscroll"><table id="logTable"></table></div></div>
   </div>
 </div>
+<!-- ============ 빠른 수정 팝업 ============ -->
+<div class="modal hide" id="editModal">
+  <div class="box">
+    <div class="mhead"><h2 id="m_title">고객 수정</h2><button class="x" id="m_x">✕</button></div>
+    <div class="grid g2">
+      <div class="field"><label>고객명</label><input type="text" id="m_name" placeholder="이름"></div>
+      <div class="field"><label>연락처</label><input type="text" id="m_phone" placeholder="010-0000-0000"></div>
+      <div class="field"><label>담당자</label><select id="m_dealer"></select></div>
+      <div class="field"><label>상태</label><select id="m_status"><option value="lead">상담중</option><option value="dep">입금완료</option><option value="sold">판매완료</option><option value="cancel">취소</option></select></div>
+      <div class="field"><label>입금 유형</label><select id="m_dep"><option value="none">없음</option><option value="res">예약금 5만</option><option value="down">선수금 20만</option><option value="both">예약+선수 25만</option></select></div>
+      <div class="field"><label>입금일 (선수금 지급일)</label><input type="date" id="m_depdate"></div>
+      <div class="field" style="grid-column:1/3"><label>차종</label><input type="text" id="m_car" placeholder="예: G80"></div>
+      <div class="field"><label>차 금액 (원)</label><input type="text" inputmode="numeric" id="m_price" placeholder="0"></div>
+      <div class="field"><label>차 마진 (원)</label><input type="text" inputmode="numeric" id="m_margin" placeholder="0"></div>
+      <div class="field"><label>수수료 (원)</label><input type="text" inputmode="numeric" id="m_fee" placeholder="0"></div>
+      <div class="field"><label>서비스 (원, 차감)</label><input type="text" inputmode="numeric" id="m_service" placeholder="0"></div>
+      <div class="field"><label>등록일(문의)</label><input type="date" id="m_reg"></div>
+      <div class="field"><label>판매일</label><input type="date" id="m_solddate"></div>
+    </div>
+    <div class="row-foot">
+      <button class="btn danger" id="m_del">삭제</button>
+      <div class="received">받은금액 <b id="m_recv">₩0</b> · 판매금액 <b id="m_sale" style="color:var(--pos)">₩0</b></div>
+      <div style="display:flex;gap:8px">
+        <button class="save ghost" id="m_close">취소</button>
+        <button class="save" id="m_save">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -273,7 +311,7 @@ const pct=n=>(isFinite(n)?(n*100).toFixed(2):"0.00")+"%";
 const $=id=>document.getElementById(id);
 const today=()=>new Date().toISOString().slice(0,10);
 const ym=d=>d.slice(0,7);
-let S={daily:[],customers:[],settings:{}}, view="dash", gran="day", sampleMode=false, editId=null, curDealer="전체", curMonth=today().slice(0,7), dashMonth=today().slice(0,7), setMonth=today().slice(0,7), crmFilter="all";
+let S={daily:[],customers:[],settings:{}}, view="dash", gran="day", sampleMode=false, editId=null, curDealer="전체", curMonth=today().slice(0,7), dashMonth=today().slice(0,7), setMonth=today().slice(0,7), crmFilter="all", crmMonth="all";
 
 /* ===== 공유 DB 설정 — 이 두 줄만 채우면 팀 공유가 켜집니다 (비우면 이 기기에만 저장) ===== */
 const SB_URL = "https://fxvwiimpplfiowbvtkrf.supabase.co";   /* 예: https://abcd1234.supabase.co */
@@ -554,17 +592,17 @@ function renderDealerView(){
   ]);
   const order={lead:0,dep:1,sold:2,cancel:3}, lbl={lead:"상담중",dep:"입금완료",sold:"판매완료",cancel:"취소"};
   cs=cs.slice().sort((a,b)=>{const n=(needsCheck(b)?1:0)-(needsCheck(a)?1:0);if(n)return n;if(order[a.status]!==order[b.status])return order[a.status]-order[b.status];return(b.reg||"")<(a.reg||"")?-1:1;});
-  $("dealerBoard").innerHTML=`<thead><tr><th>체크</th><th>고객</th><th>연락처</th><th>담당</th><th>상태</th><th>차종</th><th>받은금액</th><th>판매이익</th><th>경과</th></tr></thead><tbody>`+
+  $("dealerBoard").innerHTML=`<thead><tr><th>체크</th><th>고객</th><th>연락처</th><th>담당</th><th>상태</th><th>차종</th><th>받은금액</th><th>입금일</th><th>판매이익</th><th>경과</th></tr></thead><tbody>`+
     (cs.length?cs.map(c=>{const nc=needsCheck(c);return `<tr class="clk" data-ec="${c.id}">
       <td><input type="checkbox" data-chk="${c.id}" ${c.checked?"checked":""} style="width:18px;height:18px;cursor:pointer"></td>
       <td>${nc?'<span class="flag"></span>':""}${c.name||"-"}</td>
       <td class="num">${c.phone||"-"}</td><td>${c.dealer||"-"}</td>
       <td><span class="pill ${c.status==="sold"?"p-sold":c.status==="cancel"?"p-cancel":c.status==="dep"?"p-dep":"p-lead"}">${lbl[c.status]||"상담중"}</span></td>
-      <td>${c.car||"-"}</td><td class="money">${fmt(depAmt(c.dep))}</td><td class="profit">${c.profit?fmt(c.profit):"-"}</td>
+      <td>${c.car||"-"}</td><td class="money">${fmt(depAmt(c.dep))}</td><td class="num">${c.depdate?c.depdate.slice(5).replace("-","."):"-"}</td><td class="profit">${c.profit?fmt(c.profit):"-"}</td>
       <td class="num" style="color:${nc?"var(--neg)":"var(--muted)"}">${daysAgo(c.reg)}일</td></tr>`;}).join("")
-      :`<tr><td colspan="9"><div class="empty"><b>고객이 없어요</b>고객 장부에서 담당자를 지정해 추가하세요.</div></td></tr>`)+`</tbody>`;
+      :`<tr><td colspan="10"><div class="empty"><b>고객이 없어요</b>고객 장부에서 담당자를 지정해 추가하세요.</div></td></tr>`)+`</tbody>`;
   $("dealerBoard").querySelectorAll("[data-chk]").forEach(cb=>cb.onclick=async e=>{e.stopPropagation();const c=S.customers.find(x=>x.id===cb.dataset.chk);if(c){c.checked=cb.checked;await save("확인체크 "+(c.name||"")+(cb.checked?" ✔":" 해제"));renderDealerView();}});
-  $("dealerBoard").querySelectorAll("tr.clk").forEach(tr=>tr.onclick=()=>{setView("crm");editCust(tr.dataset.ec);});
+  $("dealerBoard").querySelectorAll("tr.clk").forEach(tr=>tr.onclick=()=>openEdit(tr.dataset.ec));
 }
 
 /* ---------- 일간 입력 ---------- */
@@ -595,19 +633,25 @@ function saleProfit(){return cn("c_margin")+cn("c_fee")-cn("c_service");}
 function cSaleTotal(){$("c_saleTotal").textContent=fmt(saleProfit());}
 function renderCRM(){
   fillDealerSelect();
+  const monthOf=c=>(c.reg||c.start||c.solddate||"").slice(0,7);
+  const mset=[...new Set(S.customers.map(monthOf).filter(Boolean))].sort().reverse();
+  $("crmMonth").innerHTML=`<option value="all"${crmMonth==="all"?" selected":""}>전체 기간</option>`+mset.map(m=>`<option value="${m}"${m===crmMonth?" selected":""}>${m.slice(0,4)}년 ${Number(m.slice(5,7))}월</option>`).join("");
+  $("crmMonth").onchange=()=>{crmMonth=$("crmMonth").value;renderCRM();};
+  let base=S.customers;
+  if(crmMonth!=="all") base=base.filter(c=>monthOf(c)===crmMonth);
   const F={all:"전체",dep:"입금·미판매",lead:"상담중",sold:"판매완료",cancel:"취소"};
-  const cnt={all:S.customers.length};
-  S.customers.forEach(c=>{const s=c.status||"lead";cnt[s]=(cnt[s]||0)+1;});
+  const cnt={all:base.length};
+  base.forEach(c=>{const s=c.status||"lead";cnt[s]=(cnt[s]||0)+1;});
   $("crmChips").innerHTML=Object.keys(F).map(k=>`<button class="chip ${k===crmFilter?'on':''}" data-cf="${k}">${F[k]} <b style="opacity:.65;margin-left:2px">${cnt[k]||0}</b></button>`).join("");
   $("crmChips").querySelectorAll("[data-cf]").forEach(b=>b.onclick=()=>{crmFilter=b.dataset.cf;renderCRM();});
-  let cs=[...S.customers].sort((a,b)=>(b.reg||"")<(a.reg||"")?-1:1);
+  let cs=[...base].sort((a,b)=>(b.reg||"")<(a.reg||"")?-1:1);
   if(crmFilter!=="all") cs=cs.filter(c=>(c.status||"lead")===crmFilter);
   const badge=c=>c.status==="sold"?'<span class="pill p-sold">판매완료</span>':c.status==="cancel"?'<span class="pill p-cancel">취소</span>':c.status==="dep"?'<span class="pill p-dep">입금</span>':'<span class="pill p-lead">상담중</span>';
   $("crmTable").innerHTML=`<thead><tr><th>등록일</th><th>착수일</th><th>고객</th><th>연락처</th><th>입금자</th><th>담당</th><th>받은금액</th><th>상태</th><th>차종</th><th>차금액</th><th>판매금액</th><th></th></tr></thead><tbody>`+
     (cs.length?cs.map(c=>`<tr class="clk" data-id="${c.id}"><td>${(c.reg||"").slice(5).replace("-",".")}</td><td>${(c.start||"").slice(5).replace("-",".")||"-"}</td><td>${c.name||"-"}</td><td class="num">${c.phone||"-"}</td><td>${c.payer||"-"}</td><td>${c.dealer||"-"}</td><td class="money">${fmt(depAmt(c.dep))}</td><td>${badge(c)}</td><td>${c.car||"-"}</td><td class="num">${c.price?fmt(c.price):"-"}</td><td class="profit">${c.profit?fmt(c.profit):"-"}</td><td><button class="del" data-delc="${c.id}">✕</button></td></tr>`).join("")
       :`<tr><td colspan="12"><div class="empty"><b>고객이 없어요</b>위에서 고객을 추가하면 KPI에 자동 반영됩니다.</div></td></tr>`)+`</tbody>`;
   $("crmTable").querySelectorAll("[data-delc]").forEach(b=>b.onclick=async e=>{e.stopPropagation();const _dc=S.customers.find(c=>c.id===b.dataset.delc);S.customers=S.customers.filter(c=>c.id!==b.dataset.delc);await save("고객 삭제 "+((_dc&&_dc.name)||""));renderCRM();renderDash();});
-  $("crmTable").querySelectorAll("tr.clk").forEach(tr=>tr.onclick=()=>editCust(tr.dataset.id));
+  $("crmTable").querySelectorAll("tr.clk").forEach(tr=>tr.onclick=()=>openEdit(tr.dataset.id));
 }
 function clearCRMForm(){editId=null;$("crmFormTitle").textContent="고객 추가";$("c_cancel").classList.add("hide");
   $("c_reg").value=today();$("c_start").value=today();["c_name","c_phone","c_payer","c_car"].forEach(i=>$(i).value="");
@@ -633,6 +677,42 @@ async function saveCust(){
   const prev=S.customers.find(c=>c.id===o.id);o.checked=prev?!!prev.checked:false;
   const i=S.customers.findIndex(c=>c.id===o.id);if(i>=0)S.customers[i]=o;else S.customers.push(o);
   await save((i>=0?"고객 수정 ":"고객 추가 ")+name);clearCRMForm();renderCRM();renderDash();toast(i>=0?"수정됨":"고객 저장됨");
+}
+
+/* ---------- 빠른 수정 모달 (담당자/고객장부 어디서든 줄 클릭 → 그 자리서 수정) ---------- */
+let mEditId=null;
+function mTotals(){$("m_recv").textContent=fmt(depAmt($("m_dep").value));$("m_sale").textContent=fmt(cn("m_margin")+cn("m_fee")-cn("m_service"));}
+function openEdit(id){
+  const c=S.customers.find(x=>x.id===id); if(!c)return;
+  mEditId=id;
+  $("m_dealer").innerHTML=`<option value="">(미지정)</option>`+(S.settings.dealers||[]).map(d=>`<option>${d}</option>`).join("");
+  $("m_name").value=c.name||""; $("m_phone").value=c.phone||"";
+  $("m_dealer").value=c.dealer||""; $("m_status").value=c.status||"lead";
+  $("m_dep").value=c.dep||"none"; $("m_depdate").value=c.depdate||"";
+  $("m_car").value=c.car||"";
+  $("m_price").value=c.price?num(c.price):""; $("m_margin").value=c.margin?num(c.margin):"";
+  $("m_fee").value=c.fee?num(c.fee):""; $("m_service").value=c.service?num(c.service):"";
+  $("m_reg").value=c.reg||""; $("m_solddate").value=c.solddate||"";
+  $("m_title").textContent=(c.name||c.phone||"고객")+" 수정";
+  mTotals();
+  $("editModal").classList.remove("hide");
+}
+function closeEdit(){$("editModal").classList.add("hide");mEditId=null;}
+async function saveEdit(){
+  const c=S.customers.find(x=>x.id===mEditId); if(!c){closeEdit();return;}
+  c.name=$("m_name").value.trim(); c.phone=$("m_phone").value.trim(); if(!c.payer)c.payer=c.name;
+  c.dealer=$("m_dealer").value; c.status=$("m_status").value;
+  c.dep=$("m_dep").value; c.depdate=$("m_depdate").value; c.car=$("m_car").value.trim();
+  c.price=cn("m_price"); c.margin=cn("m_margin"); c.fee=cn("m_fee"); c.service=cn("m_service"); c.profit=c.margin+c.fee-c.service;
+  c.reg=$("m_reg").value||c.reg; c.solddate=$("m_solddate").value;
+  if(c.status==="sold"&&!c.solddate)c.solddate=today();
+  closeEdit(); await save("고객 수정 "+(c.name||c.phone||"")); setView(view); toast("저장됨");
+}
+async function delEdit(){
+  if(!mEditId)return; const c=S.customers.find(x=>x.id===mEditId);
+  if(!confirm(((c&&c.name)||"이 고객")+" 삭제할까요?"))return;
+  S.customers=S.customers.filter(x=>x.id!==mEditId); closeEdit();
+  await save("고객 삭제 "+((c&&c.name)||"")); setView(view);
 }
 
 /* ---------- 설정 ---------- */
@@ -747,6 +827,11 @@ $("c_cancel").onclick=clearCRMForm;
 $("c_dep").addEventListener("change",cReceived);
 $("c_status").addEventListener("change",toggleSale);
 ["c_price","c_margin","c_fee","c_service"].forEach(id=>$(id).addEventListener("input",()=>{const e=$(id),d=e.value.replace(/\D/g,"");e.value=d?(+d).toLocaleString("ko-KR"):"";cSaleTotal();}));
+$("m_save").onclick=saveEdit; $("m_close").onclick=closeEdit; $("m_x").onclick=closeEdit; $("m_del").onclick=delEdit;
+$("m_dep").addEventListener("change",mTotals);
+$("m_status").addEventListener("change",()=>{if($("m_status").value==="sold"&&!$("m_solddate").value)$("m_solddate").value=today();});
+["m_price","m_margin","m_fee","m_service"].forEach(id=>$(id).addEventListener("input",()=>{const e=$(id),d=e.value.replace(/\D/g,"");e.value=d?(+d).toLocaleString("ko-KR"):"";mTotals();}));
+$("editModal").addEventListener("click",e=>{if(e.target.id==="editModal")closeEdit();});
 $("c_phone").addEventListener("change",()=>{
   if(editId)return;
   const c=findByPhone($("c_phone").value);
