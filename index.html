@@ -2,15 +2,15 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --ink:#15171C;--surface:#F6F4EF;--card:#FFFFFF;--line:#E7E3D9;--muted:#857F73;
     --amber:#C5731A;--amber-bg:#FBEFDF;--teal:#0E7C73;--teal-bg:#E1F0EE;
     --pos:#15803D;--neg:#B4453B;--blue:#2563EB;
     --kr:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
-    --disp:"Space Grotesk",var(--kr);--mono:"JetBrains Mono",ui-monospace,monospace;
+    --disp:var(--kr);--mono:var(--kr);
   }
+  td.num,td.money,td.profit,.k-val,.now,input,.kpi .k-val{font-variant-numeric:tabular-nums}
   *{box-sizing:border-box}
   body{margin:0;background:var(--surface);color:var(--ink);font-family:var(--kr);-webkit-font-smoothing:antialiased;line-height:1.45}
   .wrap{max-width:1040px;margin:0 auto;padding:20px 16px 70px}
