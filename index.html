@@ -325,6 +325,7 @@ const EDITOR_KEY="kkepjangi:editor";
 let editor=(()=>{try{return localStorage.getItem(EDITOR_KEY)||"";}catch(e){return "";}})();
 function setEditor(n){editor=(n||"").trim();try{localStorage.setItem(EDITOR_KEY,editor);}catch(e){}}
 function logAction(action){if(!action)return;(S.log=S.log||[]).push({who:editor||"익명",at:new Date().toISOString(),action});if(S.log.length>300)S.log=S.log.slice(-300);}
+function nameOK(){if(editor&&editor.trim())return true;toast("✋ 우상단 '내 이름'을 먼저 입력하세요 — 익명 변경은 차단됩니다");try{$("editorName").focus();$("editorName").style.boxShadow="0 0 0 3px var(--neg)";setTimeout(()=>$("editorName").style.boxShadow="",1500);}catch(e){}return false;}
 
 const depAmt=t=>t==="res"?RES:t==="down"?DOWN:t==="both"?RES+DOWN:0;
 const digits=s=>(s||"").replace(/\D/g,"");
@@ -373,6 +374,7 @@ function allMonths(){
   return [...s].filter(Boolean).sort().reverse();
 }
 async function save(action){
+  if(action&&!nameOK())return false;
   if(action)logAction(action);
   S.daily.sort((a,b)=>a.date<b.date?-1:1);
   if(sb){
@@ -641,6 +643,7 @@ function renderDaily(){
   $("dailyTable").querySelectorAll("tr.clk").forEach(tr=>tr.onclick=()=>{const x=S.daily.find(d=>d.date===tr.dataset.d);$("d_date").value=x.date;$("d_views").value=x.views||"";$("d_subs").value=x.subs||"";window.scrollTo({top:0,behavior:"smooth"});});
 }
 async function saveDaily(){
+  if(!nameOK())return;
   const date=$("d_date").value;if(!date){toast("날짜를 선택하세요");return;}
   if(sampleMode){S.customers=[];S.daily=[];sampleMode=false;}
   const o={date,views:+$("d_views").value||0,subs:+$("d_subs").value||0};
@@ -691,6 +694,7 @@ function editCust(id){const c=S.customers.find(x=>x.id===id);if(!c)return;editId
   $("c_price").value=c.price?num(c.price):"";$("c_margin").value=c.margin?num(c.margin):"";$("c_fee").value=c.fee?num(c.fee):"";$("c_service").value=c.service?num(c.service):"";
   toggleSale();cReceived();cSaleTotal();window.scrollTo({top:0,behavior:"smooth"});}
 async function saveCust(){
+  if(!nameOK())return;
   const name=$("c_name").value.trim();if(!name){toast("고객명을 입력하세요");return;}
   if(sampleMode){S.customers=[];S.daily=[];sampleMode=false;}
   const margin=cn("c_margin"), fee=cn("c_fee"), service=cn("c_service"), price=cn("c_price");
@@ -725,6 +729,7 @@ function openEdit(id){
 }
 function closeEdit(){$("editModal").classList.add("hide");mEditId=null;}
 async function saveEdit(){
+  if(!nameOK())return;
   const c=S.customers.find(x=>x.id===mEditId); if(!c){closeEdit();return;}
   c.name=$("m_name").value.trim(); c.phone=$("m_phone").value.trim(); if(!c.payer)c.payer=c.name;
   c.dealer=$("m_dealer").value; c.status=$("m_status").value;
@@ -735,7 +740,7 @@ async function saveEdit(){
   closeEdit(); await save("고객 수정 "+(c.name||c.phone||"")); setView(view); toast("저장됨");
 }
 async function delEdit(){
-  if(!mEditId)return; const c=S.customers.find(x=>x.id===mEditId);
+  if(!mEditId)return; if(!nameOK())return; const c=S.customers.find(x=>x.id===mEditId);
   if(!confirm(((c&&c.name)||"이 고객")+" 삭제할까요?"))return;
   S.customers=S.customers.filter(x=>x.id!==mEditId); closeEdit();
   await save("고객 삭제 "+((c&&c.name)||"")); setView(view);
