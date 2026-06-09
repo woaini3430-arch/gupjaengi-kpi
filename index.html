@@ -275,8 +275,8 @@ const ym=d=>d.slice(0,7);
 let S={daily:[],customers:[],settings:{}}, view="dash", gran="day", sampleMode=false, editId=null, curDealer="전체", curMonth=today().slice(0,7), dashMonth=today().slice(0,7), setMonth=today().slice(0,7);
 
 /* ===== 공유 DB 설정 — 이 두 줄만 채우면 팀 공유가 켜집니다 (비우면 이 기기에만 저장) ===== */
-const SB_URL = "";   /* 예: https://abcd1234.supabase.co */
-const SB_KEY = "";   /* anon public key */
+const SB_URL = "https://fxvwiimpplfiowbvtkrf.supabase.co";   /* 예: https://abcd1234.supabase.co */
+const SB_KEY = "sb_publishable_Y93md3_HMbdy2Ckpw23Vbg_zbFERbr8";   /* anon public key */
 let sb=null;
 
 /* ===== 수정 기록 — 각자 이름을 적어두면 저장 시 누가·언제·무엇을 남김 (로그인 아님) ===== */
