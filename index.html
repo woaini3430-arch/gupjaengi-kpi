@@ -540,7 +540,7 @@ function renderDash(){
   ]);
   card("kpiFin",[
     {l:ML+" 매출 (차 금액)",v:fmt(m.revenue),cls:"money",d:"판매 "+m.sales+"건 차량가 합"},
-    {l:ML+" 받은금액",v:fmt(m.received),cls:"money",d:"예약/선수 입금 합"},
+    {l:ML+" 예약금 매출",v:fmt(m.received),cls:"money",d:"예약금5만+선수금20만 입금 합"},
     {l:ML+" 판매금액 합",v:fmt(m.gross),cls:"money",d:"마진+수수료−서비스"},
     {l:ML+" 영업이익",v:fmt(opProfit),cls:opProfit>=0?"good":"",d:"판매금액 − 고정비 − 변동비"},
     {l:ML+" 영업이익률",v:pct(opMargin),cls:opMargin>=0?"good":"",d:"영업이익 ÷ 매출"},
