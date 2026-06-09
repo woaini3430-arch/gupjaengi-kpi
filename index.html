@@ -214,7 +214,8 @@
     </div>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:2px 2px 14px">
       <div class="chips" id="crmChips" style="margin:0"></div>
-      <select id="crmMonth" style="max-width:160px;margin-left:auto"></select>
+      <input id="crmSearch" placeholder="🔍 번호·이름·차종" style="max-width:190px;margin-left:auto;font-family:var(--kr);font-size:14px">
+      <select id="crmMonth" style="max-width:150px"></select>
     </div>
     <div class="panel"><div class="ptitle">고객 목록 (줄을 누르면 바로 수정)</div><div class="tscroll"><table id="crmTable"></table></div></div>
   </div>
@@ -223,7 +224,8 @@
   <div id="view-dealer" class="hide">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
       <div class="chips" id="dealerChips" style="margin:0"></div>
-      <select id="dealerMonth" style="max-width:170px;margin-left:auto"></select>
+      <input id="dealerSearch" placeholder="🔍 번호·이름·차종" style="max-width:200px;margin-left:auto;font-family:var(--kr);font-size:14px">
+      <select id="dealerMonth" style="max-width:150px"></select>
     </div>
     <div class="kpis g6" id="dealerKpi"></div>
     <div class="panel"><div class="ptitle">진행 상황 <span style="font-weight:600;color:var(--muted)">· 확인 필요한 고객이 위로</span></div><div class="tscroll"><table id="dealerBoard"></table></div></div>
@@ -330,7 +332,11 @@ const pct=n=>(isFinite(n)?(n*100).toFixed(2):"0.00")+"%";
 const $=id=>document.getElementById(id);
 const today=()=>new Date().toISOString().slice(0,10);
 const ym=d=>d.slice(0,7);
-let S={daily:[],customers:[],settings:{}}, view="dash", gran="day", sampleMode=false, editId=null, curDealer="전체", curMonth=today().slice(0,7), dashMonth=today().slice(0,7), setMonth=today().slice(0,7), crmFilter="all", crmMonth="all";
+let S={daily:[],customers:[],settings:{}}, view="dash", gran="day", sampleMode=false, editId=null, curDealer="전체", curMonth=today().slice(0,7), dashMonth=today().slice(0,7), setMonth=today().slice(0,7), crmFilter="all", crmMonth="all", dealerSearch="", crmSearch="";
+function matchSearch(c,q){q=(q||"").trim().toLowerCase();if(!q)return true;const dq=q.replace(/\D/g,"");
+  const inPhone=dq.length>=2&&(c.phone||"").replace(/\D/g,"").includes(dq);
+  const inText=((c.name||"")+(c.car||"")+(c.dealer||"")+(c.payer||"")).toLowerCase().includes(q);
+  return inPhone||inText;}
 
 /* ===== 공유 DB 설정 — 이 두 줄만 채우면 팀 공유가 켜집니다 (비우면 이 기기에만 저장) ===== */
 const SB_URL = "https://fxvwiimpplfiowbvtkrf.supabase.co";   /* 예: https://abcd1234.supabase.co */
@@ -621,7 +627,8 @@ function renderDealerView(){
   if(!months.includes(curMonth)&&curMonth!=="all")months.unshift(curMonth);
   $("dealerMonth").innerHTML=`<option value="all"${curMonth==="all"?" selected":""}>전체 기간</option>`+months.map(m=>`<option value="${m}"${m===curMonth?" selected":""}>${Number(m.slice(5,7))}월 (${m.slice(0,4)})</option>`).join("");
   $("dealerMonth").onchange=()=>{curMonth=$("dealerMonth").value;renderDealerView();};
-  let cs=S.customers.filter(c=>(curDealer==="전체"||c.dealer===curDealer)&&(curMonth==="all"||custMonth(c)===curMonth));
+  $("dealerSearch").oninput=()=>{dealerSearch=$("dealerSearch").value;renderDealerView();};
+  let cs=S.customers.filter(c=>(curDealer==="전체"||c.dealer===curDealer)&&(curMonth==="all"||custMonth(c)===curMonth)&&matchSearch(c,dealerSearch));
   const active=cs.filter(c=>c.status!=="sold"&&c.status!=="cancel");
   const sold=cs.filter(c=>c.status==="sold");
   const profit=sold.reduce((s,c)=>s+(c.profit||0),0);
@@ -683,8 +690,10 @@ function renderCRM(){
   const mset=[...new Set(S.customers.map(monthOf).filter(Boolean))].sort().reverse();
   $("crmMonth").innerHTML=`<option value="all"${crmMonth==="all"?" selected":""}>전체 기간</option>`+mset.map(m=>`<option value="${m}"${m===crmMonth?" selected":""}>${m.slice(0,4)}년 ${Number(m.slice(5,7))}월</option>`).join("");
   $("crmMonth").onchange=()=>{crmMonth=$("crmMonth").value;renderCRM();};
+  $("crmSearch").oninput=()=>{crmSearch=$("crmSearch").value;renderCRM();};
   let base=S.customers;
   if(crmMonth!=="all") base=base.filter(c=>monthOf(c)===crmMonth);
+  if(crmSearch.trim()) base=base.filter(c=>matchSearch(c,crmSearch));
   const F={all:"전체",dep:"입금·미판매",lead:"상담중",sold:"판매완료",cancel:"취소"};
   const cnt={all:base.length};
   base.forEach(c=>{const s=c.status||"lead";cnt[s]=(cnt[s]||0)+1;});
