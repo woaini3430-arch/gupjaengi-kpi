@@ -647,9 +647,9 @@ function renderCRM(){
   let cs=[...base].sort((a,b)=>(b.reg||"")<(a.reg||"")?-1:1);
   if(crmFilter!=="all") cs=cs.filter(c=>(c.status||"lead")===crmFilter);
   const badge=c=>c.status==="sold"?'<span class="pill p-sold">판매완료</span>':c.status==="cancel"?'<span class="pill p-cancel">취소</span>':c.status==="dep"?'<span class="pill p-dep">입금</span>':'<span class="pill p-lead">상담중</span>';
-  $("crmTable").innerHTML=`<thead><tr><th>등록일</th><th>착수일</th><th>고객</th><th>연락처</th><th>입금자</th><th>담당</th><th>받은금액</th><th>상태</th><th>차종</th><th>차금액</th><th>판매금액</th><th></th></tr></thead><tbody>`+
-    (cs.length?cs.map(c=>`<tr class="clk" data-id="${c.id}"><td>${(c.reg||"").slice(5).replace("-",".")}</td><td>${(c.start||"").slice(5).replace("-",".")||"-"}</td><td>${c.name||"-"}</td><td class="num">${c.phone||"-"}</td><td>${c.payer||"-"}</td><td>${c.dealer||"-"}</td><td class="money">${fmt(depAmt(c.dep))}</td><td>${badge(c)}</td><td>${c.car||"-"}</td><td class="num">${c.price?fmt(c.price):"-"}</td><td class="profit">${c.profit?fmt(c.profit):"-"}</td><td><button class="del" data-delc="${c.id}">✕</button></td></tr>`).join("")
-      :`<tr><td colspan="12"><div class="empty"><b>고객이 없어요</b>위에서 고객을 추가하면 KPI에 자동 반영됩니다.</div></td></tr>`)+`</tbody>`;
+  $("crmTable").innerHTML=`<thead><tr><th>등록일</th><th>연락처</th><th>입금자</th><th>담당</th><th>받은금액</th><th>상태</th><th>차종</th><th>차금액</th><th>판매금액</th><th></th></tr></thead><tbody>`+
+    (cs.length?cs.map(c=>`<tr class="clk" data-id="${c.id}"><td>${(c.reg||"").slice(5).replace("-",".")}</td><td class="num">${c.phone||"-"}</td><td>${c.payer||"-"}</td><td>${c.dealer||"-"}</td><td class="money">${fmt(depAmt(c.dep))}</td><td>${badge(c)}</td><td>${c.car||"-"}</td><td class="num">${c.price?fmt(c.price):"-"}</td><td class="profit">${c.profit?fmt(c.profit):"-"}</td><td><button class="del" data-delc="${c.id}">✕</button></td></tr>`).join("")
+      :`<tr><td colspan="10"><div class="empty"><b>고객이 없어요</b>위에서 고객을 추가하면 KPI에 자동 반영됩니다.</div></td></tr>`)+`</tbody>`;
   $("crmTable").querySelectorAll("[data-delc]").forEach(b=>b.onclick=async e=>{e.stopPropagation();const _dc=S.customers.find(c=>c.id===b.dataset.delc);S.customers=S.customers.filter(c=>c.id!==b.dataset.delc);await save("고객 삭제 "+((_dc&&_dc.name)||""));renderCRM();renderDash();});
   $("crmTable").querySelectorAll("tr.clk").forEach(tr=>tr.onclick=()=>openEdit(tr.dataset.id));
 }
