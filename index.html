@@ -1,0 +1,738 @@
+<!-- 겁쟁이딜러 KPI · 고객 통합 트래커 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#15171C;--surface:#F6F4EF;--card:#FFFFFF;--line:#E7E3D9;--muted:#857F73;
+    --amber:#C5731A;--amber-bg:#FBEFDF;--teal:#0E7C73;--teal-bg:#E1F0EE;
+    --pos:#15803D;--neg:#B4453B;--blue:#2563EB;
+    --kr:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+    --disp:"Space Grotesk",var(--kr);--mono:"JetBrains Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--surface);color:var(--ink);font-family:var(--kr);-webkit-font-smoothing:antialiased;line-height:1.45}
+  .wrap{max-width:1040px;margin:0 auto;padding:20px 16px 70px}
+  header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .brand{font-family:var(--disp);font-weight:700;font-size:23px;letter-spacing:-.5px}
+  .brand .dot{color:var(--amber)}
+  .sub{color:var(--muted);font-size:13px}
+  .toolbar{display:flex;gap:8px}
+  .btn{font-size:13px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:600}
+  .btn:hover{border-color:#cfc9bb}.btn.danger{color:var(--neg)}
+
+  /* 메인 탭 */
+  .nav{display:flex;gap:4px;background:#ECE8DE;border-radius:13px;padding:4px;margin-bottom:18px;flex-wrap:wrap}
+  .nav button{flex:1;min-width:84px;border:none;background:none;font-family:var(--kr);font-weight:700;font-size:14px;color:var(--muted);padding:9px 10px;border-radius:9px;cursor:pointer}
+  .nav button.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:16px}
+  .card h2{font-family:var(--disp);font-size:15px;margin:0 0 14px;letter-spacing:-.2px}
+  .card h2 .tag{font-family:var(--kr);font-size:11px;color:var(--muted);font-weight:600;margin-left:8px}
+  .grid{display:grid;gap:12px}
+  .g6{grid-template-columns:repeat(6,1fr)}.g5{grid-template-columns:repeat(5,1fr)}.g4{grid-template-columns:repeat(4,1fr)}.g2{grid-template-columns:repeat(2,1fr)}
+  .field{display:flex;flex-direction:column;gap:5px;min-width:0}
+  .field label{font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .field .hint{font-size:11px;color:#a39c8e}
+  input,select{font-family:var(--mono);font-size:15px;font-weight:600;border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 11px;color:var(--ink);width:100%}
+  select,input[type=date]{font-family:var(--kr);font-size:14px}
+  input:focus,select:focus{outline:none;border-color:var(--amber);box-shadow:0 0 0 3px var(--amber-bg)}
+  .row-foot{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:16px;flex-wrap:wrap}
+  .received{font-size:13px;color:var(--muted);font-weight:600}.received b{font-family:var(--mono);font-size:19px;color:var(--amber);margin-left:6px}
+  .save{background:var(--ink);color:#fff;border:none;padding:11px 22px;border-radius:11px;font-family:var(--kr);font-weight:700;font-size:15px;cursor:pointer}
+  .save:hover{background:#000}
+  .save.ghost{background:#fff;color:var(--muted);border:1px solid var(--line)}
+
+  /* KPI */
+  .sect-label{font-size:12px;font-weight:700;color:var(--muted);margin:6px 2px 8px;letter-spacing:.3px}
+  .kpis{display:grid;gap:12px;margin-bottom:14px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 15px}
+  .kpi .k-label{font-size:11.5px;color:var(--muted);font-weight:600;margin-bottom:8px}
+  .kpi .k-val{font-family:var(--mono);font-weight:700;font-size:22px;letter-spacing:-.5px;line-height:1}
+  .kpi .k-delta{font-size:11.5px;font-weight:600;margin-top:7px;color:var(--muted)}
+  .k-delta .up{color:var(--pos)}.k-delta .down{color:var(--neg)}
+  .kpi.money .k-val{color:var(--amber)}.kpi.good .k-val{color:var(--pos)}
+
+  .tabs{display:inline-flex;background:#ECE8DE;border-radius:11px;padding:4px;margin-bottom:14px}
+  .tabs button{border:none;background:none;font-weight:700;font-size:14px;color:var(--muted);padding:7px 16px;border-radius:8px;cursor:pointer;font-family:var(--kr)}
+  .tabs button.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+
+  .charts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+  .chart{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+  .chart h3{font-family:var(--disp);font-size:13px;margin:0 0 2px}
+  .chart .now{font-family:var(--mono);font-weight:700;font-size:21px;letter-spacing:-.5px}
+  .chart.views .now{color:var(--teal)}
+  .chart svg{width:100%;height:140px;display:block;margin-top:6px}
+
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-bottom:16px}
+  .panel .ptitle{font-family:var(--disp);font-size:13px;padding:14px 16px 0}
+  .tscroll{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;min-width:640px;font-size:13px}
+  th,td{padding:10px 12px;text-align:right;white-space:nowrap;border-bottom:1px solid #F0ECE3}
+  th{font-size:11.5px;color:var(--muted);font-weight:700;background:#FBFAF6}
+  th:first-child,td:first-child{text-align:left;font-weight:600}
+  td.num{font-family:var(--mono);font-weight:600}
+  td.money{font-family:var(--mono);color:var(--amber);font-weight:700}
+  td.profit{font-family:var(--mono);color:var(--pos);font-weight:700}
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px}
+  .p-lead{background:#EEF;color:#3949AB}.p-dep{background:var(--amber-bg);color:#8a5a18}
+  .p-sold{background:#E3F4E8;color:#1B6B36}.p-cancel{background:#F1EFEA;color:#8a8475}
+  tr.clk:hover{background:#FCFBF7;cursor:pointer}
+  .del{border:none;background:none;color:#c9c2b4;cursor:pointer;font-size:15px}.del:hover{color:var(--neg)}
+  .empty{padding:42px 20px;text-align:center;color:var(--muted)}
+  .empty b{display:block;font-size:15px;color:var(--ink);margin-bottom:6px;font-family:var(--disp)}
+
+  .banner{display:flex;align-items:center;gap:10px;justify-content:space-between;background:var(--amber-bg);border:1px solid #efd9bb;border-radius:12px;padding:10px 14px;font-size:13px;color:#8a5a18;margin-bottom:16px;font-weight:600}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 20px;border-radius:24px;font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:.25s}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .hide{display:none}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:20px;padding:7px 16px;font-weight:600;font-size:13px;cursor:pointer;color:var(--muted);font-family:var(--kr)}
+  .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .flag{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--neg);margin-right:7px;vertical-align:middle}
+  @media(max-width:820px){.g6,.g5,.g4{grid-template-columns:repeat(2,1fr)}.charts{grid-template-columns:1fr}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="brand">겁쟁이딜러 <span class="dot">·</span> KPI & 고객</div>
+      <div class="sub">매일 숫자 + 고객만 넣으면 주간·월간·KPI가 자동으로 정리됩니다</div>
+    </div>
+    <div class="toolbar">
+      <span id="syncStatus" style="font-size:12px;font-weight:700;align-self:center;margin-right:4px">○ 이 기기에만 저장</span>
+      <button class="btn" id="refreshBtn">새로고침</button>
+      <button class="btn" id="xlsxBtn">Excel 내보내기</button>
+      <button class="btn" id="exportBtn">CSV 내보내기</button>
+      <button class="btn danger" id="clearBtn">전체 비우기</button>
+    </div>
+  </header>
+
+  <div class="banner hide" id="sampleBanner">
+    <span>지금 보이는 건 예시 데이터예요. 비우고 본인 것을 넣어보세요.</span>
+    <button class="btn" id="clearSample">예시 지우기</button>
+  </div>
+
+  <div class="nav" id="nav">
+    <button data-v="dash" class="on">대시보드</button>
+    <button data-v="full">전체표</button>
+    <button data-v="daily">일간 입력</button>
+    <button data-v="crm">고객 장부</button>
+    <button data-v="dealer">담당자</button>
+    <button data-v="set">설정</button>
+  </div>
+
+  <!-- ============ 대시보드 ============ -->
+  <div id="view-dash">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+      <div class="sect-label" style="margin:0">월 선택 — 그 달의 손익·CAC가 표시됩니다</div>
+      <select id="dashMonth" style="max-width:170px"></select>
+    </div>
+    <div class="sect-label">콘텐츠 · 전환</div>
+    <div class="kpis g4" id="kpiContent"></div>
+    <div class="sect-label">재무</div>
+    <div class="kpis g5" id="kpiFin"></div>
+    <div class="sect-label">마케팅 효율 · 케파</div>
+    <div class="kpis g4" id="kpiEff"></div>
+
+    <div class="tabs" id="dashTabs">
+      <button data-g="day" class="on">일간</button><button data-g="week">주간</button><button data-g="month">월간</button>
+    </div>
+    <div class="charts">
+      <div class="chart views"><h3>조회수 추이</h3><div class="now" id="viewsNow">0</div><svg id="chartViews" viewBox="0 0 400 140" preserveAspectRatio="none"></svg></div>
+      <div class="chart subs"><h3>구독자 추이</h3><div class="now" id="subsNow">0</div><svg id="chartSubs" viewBox="0 0 400 140" preserveAspectRatio="none"></svg></div>
+    </div>
+    <div class="panel"><div class="ptitle">기간별 요약</div><div class="tscroll"><table id="aggTable"></table></div></div>
+    <div class="panel"><div class="ptitle">딜러별 커버리지</div><div class="tscroll"><table id="dealerTable"></table></div></div>
+  </div>
+
+  <!-- ============ 전체표 ============ -->
+  <div id="view-full" class="hide">
+    <div class="panel"><div class="ptitle">월별 전체 KPI <span style="font-weight:600;color:var(--muted)">· 고정비는 매달 동일 적용</span></div><div class="tscroll"><table id="fullTable"></table></div></div>
+  </div>
+
+  <!-- ============ 일간 입력 ============ -->
+  <div id="view-daily" class="hide">
+    <div class="card">
+      <h2>일간 입력 <span class="tag">조회수 · 구독자만</span></h2>
+      <div class="grid g4">
+        <div class="field"><label>날짜</label><input type="date" id="d_date"></div>
+        <div class="field"><label>조회수 (그날)</label><input type="number" id="d_views" min="0" placeholder="0"></div>
+        <div class="field"><label>구독자 (누적)</label><input type="number" id="d_subs" min="0" placeholder="0"></div>
+        <div class="field" style="justify-content:flex-end"><button class="save" id="d_save">저장하기</button></div>
+      </div>
+    </div>
+    <div class="panel"><div class="ptitle">일별 기록</div><div class="tscroll"><table id="dailyTable"></table></div></div>
+  </div>
+
+  <!-- ============ 고객 장부 ============ -->
+  <div id="view-crm" class="hide">
+    <div class="card">
+      <h2 id="crmFormTitle">고객 추가</h2>
+      <div class="grid g6">
+        <div class="field"><label>등록일</label><input type="date" id="c_reg"></div>
+        <div class="field"><label>착수일</label><input type="date" id="c_start"></div>
+        <div class="field"><label>고객명</label><input type="text" id="c_name" placeholder="홍길동"></div>
+        <div class="field"><label>연락처 <span class="hint">자동 매칭</span></label><input type="text" id="c_phone" placeholder="010-0000-0000"></div>
+        <div class="field"><label>입금자 명</label><input type="text" id="c_payer" placeholder="실입금자"></div>
+        <div class="field"><label>담당자</label><select id="c_dealer"></select></div>
+      </div>
+      <div class="grid g4" style="margin-top:12px">
+        <div class="field"><label>입금 유형</label>
+          <select id="c_dep"><option value="none">없음(상담중)</option><option value="res">예약금 5만</option><option value="down">선수금 20만</option><option value="both">예약+선수 25만</option></select></div>
+        <div class="field"><label>입금일</label><input type="date" id="c_depdate"></div>
+        <div class="field"><label>상태</label>
+          <select id="c_status"><option value="lead">상담중</option><option value="dep">입금완료</option><option value="sold">판매완료</option><option value="cancel">취소</option></select></div>
+      </div>
+      <div class="grid g6" id="saleFields" style="margin-top:12px">
+        <div class="field"><label>판매일</label><input type="date" id="c_solddate"></div>
+        <div class="field"><label>차종</label><input type="text" id="c_car" placeholder="예: G80 RG3"></div>
+        <div class="field"><label>차 금액 (원)</label><input type="number" id="c_price" min="0" placeholder="0"></div>
+        <div class="field"><label>차 마진 (원)</label><input type="number" id="c_margin" min="0" placeholder="0"></div>
+        <div class="field"><label>수수료 (원)</label><input type="number" id="c_fee" min="0" placeholder="0"></div>
+        <div class="field"><label>서비스 (원, 차감)</label><input type="number" id="c_service" min="0" placeholder="0"></div>
+      </div>
+      <div class="row-foot">
+        <div class="received">받은 금액 <b id="c_received">₩0</b> &nbsp;·&nbsp; 판매금액 <b id="c_saleTotal" style="color:var(--pos)">₩0</b></div>
+        <div style="display:flex;gap:8px">
+          <button class="save ghost hide" id="c_cancel">취소</button>
+          <button class="save" id="c_save">고객 저장</button>
+        </div>
+      </div>
+    </div>
+    <div class="panel"><div class="ptitle">고객 목록 (줄을 누르면 수정)</div><div class="tscroll"><table id="crmTable"></table></div></div>
+  </div>
+
+  <!-- ============ 담당자 ============ -->
+  <div id="view-dealer" class="hide">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <div class="chips" id="dealerChips" style="margin:0"></div>
+      <select id="dealerMonth" style="max-width:170px;margin-left:auto"></select>
+    </div>
+    <div class="kpis g6" id="dealerKpi"></div>
+    <div class="panel"><div class="ptitle">진행 상황 <span style="font-weight:600;color:var(--muted)">· 확인 필요한 고객이 위로</span></div><div class="tscroll"><table id="dealerBoard"></table></div></div>
+  </div>
+
+  <!-- ============ 설정 ============ -->
+  <div id="view-set" class="hide">
+    <div class="card">
+      <h2>고정비 <span class="tag">한 번 적으면 매달 자동 적용 · 수정 가능</span></h2>
+      <div id="fixedList"></div>
+      <div class="row-foot">
+        <button class="save ghost" id="addFixed">＋ 고정비 항목 추가</button>
+        <div class="received">월 고정비 합 <b id="sumFixed" style="color:var(--ink)">₩0</b></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>변동비 <span class="tag">달마다 따로 입력</span></h2>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+        <select id="varMonth" style="max-width:170px"></select>
+        <button class="btn" id="copyPrevVar">이전 달 복사</button>
+      </div>
+      <div id="varList"></div>
+      <div class="row-foot">
+        <button class="save ghost" id="addVar">＋ 변동비 항목 추가</button>
+        <div class="received">이 달 변동비 합 <b id="sumVar" style="color:var(--amber)">₩0</b></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>가정값 <span class="tag">LTV는 장부에서 자동 계산</span></h2>
+      <div class="grid g4">
+        <div class="field"><label>딜러 1인 월 케파 (상담 건)</label><input type="number" id="s_cap" min="1"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>담당자 명단</h2>
+      <div class="grid g4" id="dealerList"></div>
+      <div class="row-foot">
+        <input type="text" id="newDealer" placeholder="담당자 추가" style="max-width:240px">
+        <button class="save" id="addDealer">추가</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const RES=50000, DOWN=200000, KEY="kkepjangi:v2";
+const fmt=n=>"₩"+Math.round(n||0).toLocaleString("ko-KR");
+const num=n=>Math.round(n||0).toLocaleString("ko-KR");
+const pct=n=>(isFinite(n)?(n*100).toFixed(2):"0.00")+"%";
+const $=id=>document.getElementById(id);
+const today=()=>new Date().toISOString().slice(0,10);
+const ym=d=>d.slice(0,7);
+let S={daily:[],customers:[],settings:{}}, view="dash", gran="day", sampleMode=false, editId=null, curDealer="전체", curMonth=today().slice(0,7), dashMonth=today().slice(0,7), setMonth=today().slice(0,7);
+
+/* ===== 공유 DB 설정 — 이 두 줄만 채우면 팀 공유가 켜집니다 (비우면 이 기기에만 저장) ===== */
+const SB_URL = "";   /* 예: https://abcd1234.supabase.co */
+const SB_KEY = "";   /* anon public key */
+let sb=null;
+
+const depAmt=t=>t==="res"?RES:t==="down"?DOWN:t==="both"?RES+DOWN:0;
+const digits=s=>(s||"").replace(/\D/g,"");
+function findByPhone(p){const d=digits(p);if(d.length<8)return null;return S.customers.find(c=>digits(c.phone)===d)||null;}
+
+/* ---------- 저장소 ---------- */
+async function load(){
+  if(sb){
+    try{
+      const{data,error}=await sb.from("app_state").select("data").eq("id","main").maybeSingle();
+      if(error)throw error;
+      if(data&&data.data){S=data.data;fixDefaults();setSync(true);return;}
+      sample();sampleMode=true;fixDefaults();setSync(true);return;
+    }catch(e){setSync(false);}
+  }
+  try{const r=await window.storage.get(KEY,false);if(r&&r.value){S=JSON.parse(r.value);fixDefaults();return;}}catch(e){}
+  try{const ls=localStorage.getItem(KEY);if(ls){S=JSON.parse(ls);fixDefaults();return;}}catch(e){}
+  sample(); sampleMode=true; fixDefaults();
+}
+function fixDefaults(){
+  const d=S.settings=S.settings||{};
+  const cm=today().slice(0,7);
+  if(!d.fixedCosts){
+    d.fixedCosts=[]; d.varByMonth={};
+    if(d.costsByMonth){
+      const base=d.costsByMonth[cm]?cm:Object.keys(d.costsByMonth)[0];
+      (d.costsByMonth[base]||[]).forEach(c=>{if(c.type==="fixed")d.fixedCosts.push({name:c.name,amount:c.amount});});
+      Object.keys(d.costsByMonth).forEach(mk=>{const v=(d.costsByMonth[mk]||[]).filter(c=>c.type==="mktg").map(c=>({name:c.name,amount:c.amount}));if(v.length)d.varByMonth[mk]=v;});
+    }
+    if(!d.fixedCosts.length)d.fixedCosts=[{name:"임대료",amount:1500000},{name:"인건비",amount:1500000},{name:"프로그램 구독료",amount:500000}];
+    if(!Object.keys(d.varByMonth).length)d.varByMonth[cm]=[{name:"광고비",amount:800000},{name:"콘텐츠 제작비",amount:400000}];
+  }
+  delete d.costsByMonth; delete d.costs; delete d.fixed; delete d.mktg;
+  if(d.cap==null)d.cap=40; if(!d.dealers)d.dealers=["담당자1","담당자2"];
+  S.daily=S.daily||[]; S.customers=S.customers||[];
+}
+const fixedTotal=()=>(S.settings.fixedCosts||[]).reduce((s,c)=>s+(+c.amount||0),0);
+const varCosts=ym=>(S.settings.varByMonth&&S.settings.varByMonth[ym])||[];
+const varTotal=ym=>varCosts(ym).reduce((s,c)=>s+(+c.amount||0),0);
+function prevMonth(ym){const[y,m]=ym.split("-").map(Number);const d=new Date(y,m-2,1);return d.toISOString().slice(0,7);}
+function allMonths(){
+  const s=new Set([today().slice(0,7),dashMonth,setMonth]);
+  S.daily.forEach(x=>s.add(x.date.slice(0,7)));
+  S.customers.forEach(c=>[c.reg,c.start,c.depdate,c.solddate].forEach(d=>{if(d)s.add(d.slice(0,7));}));
+  Object.keys(S.settings.varByMonth||{}).forEach(k=>s.add(k));
+  return [...s].filter(Boolean).sort().reverse();
+}
+async function save(){
+  S.daily.sort((a,b)=>a.date<b.date?-1:1);
+  if(sb){
+    try{const{error}=await sb.from("app_state").upsert({id:"main",data:S,updated_at:new Date().toISOString()});if(error)throw error;setSync(true);return;}catch(e){setSync(false);}
+  }
+  try{await window.storage.set(KEY,JSON.stringify(S),false);return;}catch(e){}
+  try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+}
+async function refresh(){
+  if(!sb)return;
+  const ae=document.activeElement;
+  if(ae&&(ae.tagName==="INPUT"||ae.tagName==="SELECT"))return;   /* 입력 중이면 건너뜀 */
+  try{
+    const{data,error}=await sb.from("app_state").select("data").eq("id","main").maybeSingle();
+    if(error)throw error;
+    if(data&&data.data){S=data.data;fixDefaults();setView(view);}
+    setSync(true);
+  }catch(e){setSync(false);}
+}
+function setSync(ok){
+  const el=$("syncStatus"); if(!el)return;
+  if(!sb){el.textContent="○ 이 기기에만 저장";el.style.color="#857F73";return;}
+  el.textContent=ok?"● 공유 연결됨":"● 연결 오류";
+  el.style.color=ok?"#15803D":"#B4453B";
+}
+function sample(){
+  const d=[],c=[]; const t=new Date(); let subs=1800;
+  const v=[3200,4100,3800,5200,6100,5800,7400,8900,8200,10500,12800,11900,15200,18800];
+  for(let i=13;i>=0;i--){const dd=new Date(t);dd.setDate(t.getDate()-i);const idx=13-i;subs+=Math.round(v[idx]/120);
+    d.push({date:dd.toISOString().slice(0,10),views:v[idx],subs});}
+  const names=["김민수","이서연","박지훈","최유진","정태현","강하늘","윤소라"];
+  const cars=["G80 RG3 2.5T","쏘나타 DN8","K8 하이브리드","쏘렌토 MQ4","모델Y RWD","BMW 530i"];
+  for(let i=0;i<7;i++){const dd=new Date(t);dd.setDate(t.getDate()-(12-i));const ds=dd.toISOString().slice(0,10);
+    const st=i<2?"sold":i<5?"dep":"lead";
+    const mg=st==="sold"?(900000+i*120000):0, fe=st==="sold"?(300000+i*30000):0, sv=st==="sold"?150000:0;
+    const pr=st==="sold"?(28000000+i*3500000):0;
+    c.push({id:"c"+i,reg:ds,start:ds,name:names[i],phone:"010-"+(1000+i*111)+"-"+(2000+i*123),payer:names[i],
+      dealer:i%2?"담당자2":"담당자1",dep:st==="lead"?"none":(i%2?"both":"res"),depdate:ds,status:st,
+      solddate:st==="sold"?ds:"",car:st==="sold"?cars[i]:"",price:pr,margin:mg,fee:fe,service:sv,profit:st==="sold"?(mg+fe-sv):0});}
+  S={daily:d,customers:c,settings:{}};
+}
+
+/* ---------- 일간 파생 ---------- */
+function dailyDec(){
+  const e=[...S.daily].sort((a,b)=>a.date<b.date?-1:1);
+  e.forEach((x,i)=>x.gain=i===0?0:(x.subs||0)-(e[i-1].subs||0));
+  return e;
+}
+/* ---------- 고객 → 기간 집계 ---------- */
+function depEventsBy(field){ // field: depdate / solddate
+  return S.customers.filter(c=>field==="depdate"?(c.dep&&c.dep!=="none"&&c.depdate):(c.status==="sold"&&c.solddate));
+}
+function mondayKey(ds){const d=new Date(ds);const o=(d.getDay()+6)%7;d.setDate(d.getDate()-o);return d.toISOString().slice(0,10);}
+function md(ds){const d=new Date(ds);return(d.getMonth()+1)+"."+String(d.getDate()).padStart(2,"0");}
+function wLabel(k){const s=new Date(k),e=new Date(k);e.setDate(e.getDate()+6);return md(s.toISOString())+"~"+md(e.toISOString());}
+function mLabel(k){return k.slice(0,4)+"년 "+Number(k.slice(5,7))+"월";}
+const keyOf=(ds,g)=>g==="week"?mondayKey(ds):g==="month"?ds.slice(0,7):ds;
+const labOf=(k,g)=>g==="week"?wLabel(k):g==="month"?mLabel(k):k.slice(5).replace("-",".");
+
+function aggregate(g){
+  const dd=dailyDec();
+  const M=new Map();
+  const get=k=>{if(!M.has(k))M.set(k,{key:k,views:0,subs:0,gain:0,last:"",depCust:0,res:0,down:0,received:0,sales:0,revenue:0,profit:0});return M.get(k);};
+  dd.forEach(x=>{const o=get(keyOf(x.date,g));o.views+=x.views||0;o.gain+=x.gain;if(x.date>=o.last){o.last=x.date;o.subs=x.subs||0;}});
+  depEventsBy("depdate").forEach(c=>{const o=get(keyOf(c.depdate,g));o.depCust++;o.received+=depAmt(c.dep);if(c.dep==="res"||c.dep==="both")o.res++;if(c.dep==="down"||c.dep==="both")o.down++;});
+  depEventsBy("solddate").forEach(c=>{const o=get(keyOf(c.solddate,g));o.sales++;o.revenue+=c.price||0;o.profit+=c.profit||0;});
+  const a=[...M.values()].sort((x,y)=>x.key<y.key?-1:1);
+  a.forEach(o=>{o.conv=o.views>0?o.depCust/o.views:0;o.label=labOf(o.key,g);});
+  return a;
+}
+function monthSlice(mkey){
+  const dd=dailyDec().filter(x=>x.date.slice(0,7)===mkey);
+  const sum=(a,f)=>a.reduce((s,x)=>s+(f(x)||0),0);
+  const deps=depEventsBy("depdate").filter(c=>c.depdate.slice(0,7)===mkey);
+  const sales=depEventsBy("solddate").filter(c=>c.solddate.slice(0,7)===mkey);
+  const leads=S.customers.filter(c=>c.reg&&c.reg.slice(0,7)===mkey);
+  return{
+    views:sum(dd,x=>x.views), subs:dd.length?dd[dd.length-1].subs:lastSubs(), gain:sum(dd,x=>x.gain),
+    received:deps.reduce((s,c)=>s+depAmt(c.dep),0), depCust:deps.length,
+    revenue:sales.reduce((s,c)=>s+(c.price||0),0), gross:sales.reduce((s,c)=>s+(c.profit||0),0), sales:sales.length,
+    leads:leads.length
+  };
+}
+function lastSubs(){const dd=dailyDec();return dd.length?dd[dd.length-1].subs:0;}
+
+/* ---------- 대시보드 ---------- */
+function renderDash(){
+  const months=allMonths();
+  if(!months.includes(dashMonth))dashMonth=months[0]||today().slice(0,7);
+  $("dashMonth").innerHTML=months.map(m=>`<option value="${m}"${m===dashMonth?" selected":""}>${m.slice(0,4)}년 ${Number(m.slice(5,7))}월</option>`).join("");
+  $("dashMonth").onchange=()=>{dashMonth=$("dashMonth").value;renderDash();};
+  const mk=dashMonth, m=monthSlice(mk), st=S.settings;
+  const conv=m.views>0?m.depCust/m.views:0;
+  const opProfit=m.gross-fixedTotal()-varTotal(mk);
+  const opMargin=m.revenue>0?opProfit/m.revenue:0;
+  const soldAll=depEventsBy("solddate");
+  const buyers=new Set(); let solo=0;
+  soldAll.forEach(c=>{const d=digits(c.phone); if(d)buyers.add(d); else solo++;});
+  const uniqueBuyers=buyers.size+solo;
+  const soldProfit=soldAll.reduce((s,c)=>s+(c.profit||0),0);
+  const ltv=uniqueBuyers?soldProfit/uniqueBuyers:0;
+  const repeatCoef=uniqueBuyers?soldAll.length/uniqueBuyers:1;
+  const cac=m.sales>0?varTotal(mk)/m.sales:0;
+  const ratio=cac>0?ltv/cac:0;
+  const D=(st.dealers||[]).length||1;
+  const totalCap=D*(st.cap||0);
+  const sat=totalCap>0?m.leads/totalCap:0;
+  const active=S.customers.filter(c=>c.status!=="sold"&&c.status!=="cancel").length;
+
+  const ML=Number(mk.slice(5,7))+"월";
+  card("kpiContent",[
+    {l:"구독자 (최신)",v:num(lastSubs()),d:(m.gain>=0?'<span class="up">▲ '+num(m.gain):'<span class="down">▼ '+num(-m.gain))+` (${ML})</span>`},
+    {l:ML+" 조회수",v:num(m.views)},
+    {l:ML+" 유료전환율",v:pct(conv),d:"입금고객 ÷ 조회수"},
+    {l:ML+" 입금 고객",v:num(m.depCust)+"명",cls:""},
+  ]);
+  card("kpiFin",[
+    {l:ML+" 매출 (차 금액)",v:fmt(m.revenue),cls:"money",d:"판매 "+m.sales+"건 차량가 합"},
+    {l:ML+" 받은금액",v:fmt(m.received),cls:"money",d:"예약/선수 입금 합"},
+    {l:ML+" 판매금액 합",v:fmt(m.gross),cls:"money",d:"마진+수수료−서비스"},
+    {l:ML+" 영업이익",v:fmt(opProfit),cls:opProfit>=0?"good":"",d:"판매금액 − 고정비 − 변동비"},
+    {l:ML+" 영업이익률",v:pct(opMargin),cls:opMargin>=0?"good":"",d:"영업이익 ÷ 매출"},
+  ]);
+  card("kpiEff",[
+    {l:"CAC (획득비용)",v:fmt(cac),d:"변동비 ÷ 판매건수"},
+    {l:"LTV (고객가치)",v:fmt(ltv),d:"1인당 평생이익 · 재구매 "+repeatCoef.toFixed(2)+"회"},
+    {l:"LTV : CAC",v:(ratio?ratio.toFixed(1):"0")+"x",cls:ratio>=3?"good":"",d:"3x↑ 건강"},
+    {l:"케파 포화도",v:pct(sat),cls:sat>=0.8?"":"good",d:`담당자 ${D}명 · 활성 ${active}명`},
+  ]);
+  renderCharts(); renderAgg(); renderDealer();
+}
+function card(id,arr){$(id).innerHTML=arr.map(c=>`<div class="kpi ${c.cls||""}"><div class="k-label">${c.l}</div><div class="k-val">${c.v}</div><div class="k-delta">${c.d||"\u00A0"}</div></div>`).join("");}
+
+function renderFull(){
+  const months=allMonths().slice().sort();           // 오래된 → 최근
+  const fx=fixedTotal();
+  const rows=months.map(mk=>{
+    const m=monthSlice(mk), vt=varTotal(mk), op=m.gross-fx-vt;
+    return{mk,views:m.views,gain:m.gain,subs:m.subs,depCust:m.depCust,
+      conv:m.views>0?m.depCust/m.views:0,received:m.received,sales:m.sales,
+      revenue:m.revenue,gross:m.gross,fixed:fx,vart:vt,op,
+      margin:m.revenue>0?op/m.revenue:0,cac:m.sales>0?vt/m.sales:0};
+  });
+  const T=rows.reduce((a,r)=>{["views","gain","depCust","received","sales","revenue","gross","fixed","vart","op"].forEach(k=>a[k]=(a[k]||0)+r[k]);return a;},{});
+  T.subs=rows.length?rows[rows.length-1].subs:0;
+  T.conv=T.views>0?T.depCust/T.views:0; T.margin=T.revenue>0?T.op/T.revenue:0; T.cac=T.sales>0?T.vart/T.sales:0;
+  const cell=(v,cls="num")=>`<td class="${cls}">${v}</td>`;
+  const line=(label,r,foot)=>`<tr${foot?' style="background:#FBFAF6;font-weight:700"':''}><td>${label}</td>`+
+    cell(num(r.views))+cell((r.gain>=0?"+":"")+num(r.gain))+cell(num(r.subs))+cell(num(r.depCust))+
+    cell(pct(r.conv))+cell(fmt(r.received),"money")+cell(num(r.sales))+cell(fmt(r.revenue),"money")+
+    cell(fmt(r.gross),"money")+cell(fmt(r.fixed))+cell(fmt(r.vart))+
+    cell(fmt(r.op),r.op>=0?"profit":"num")+cell(pct(r.margin))+cell(fmt(r.cac))+`</tr>`;
+  $("fullTable").innerHTML=`<thead><tr>
+    <th>월</th><th>조회수</th><th>신규구독</th><th>누적구독</th><th>입금고객</th><th>전환율</th><th>받은금액</th><th>판매</th><th>매출</th><th>판매금액</th><th>고정비</th><th>변동비</th><th>영업이익</th><th>이익률</th><th>CAC</th>
+    </tr></thead><tbody>`+
+    (rows.length?rows.map(r=>line(`${r.mk.slice(0,4)}.${r.mk.slice(5,7)}`,r)).join("")+line("합계/평균",T,true)
+      :`<tr><td colspan="15"><div class="empty"><b>데이터가 없어요</b>일간 입력과 고객을 채우면 월별로 쌓입니다.</div></td></tr>`)+`</tbody>`;
+}
+
+function drawChart(svgId,data,field,color,nowId){
+  const svg=$(svgId),W=400,H=140,pad=14,vals=data.map(d=>d[field]||0);
+  $(nowId).textContent=vals.length?num(vals[vals.length-1]):"0";
+  if(!vals.length){svg.innerHTML="";return;}
+  const max=Math.max(...vals,1),min=Math.min(...vals,0),span=(max-min)||1;
+  const X=i=>data.length<=1?W/2:pad+i*(W-2*pad)/(data.length-1), Y=v=>H-pad-((v-min)/span)*(H-2*pad);
+  const pts=vals.map((v,i)=>[X(i),Y(v)]);
+  const line=pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" ");
+  const area=line+` L${X(data.length-1).toFixed(1)} ${H-pad} L${X(0).toFixed(1)} ${H-pad} Z`;
+  let grid="";for(let g=0;g<=2;g++){const y=pad+g*(H-2*pad)/2;grid+=`<line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="#F0ECE3"/>`;}
+  const dot=pts.length?`<circle cx="${pts[pts.length-1][0].toFixed(1)}" cy="${pts[pts.length-1][1].toFixed(1)}" r="3.5" fill="${color}"/>`:"";
+  svg.innerHTML=`<defs><linearGradient id="g_${svgId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".22"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${grid}<path d="${area}" fill="url(#g_${svgId})"/><path d="${line}" fill="none" stroke="${color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>${dot}`;
+}
+function renderCharts(){const a=aggregate(gran);drawChart("chartViews",a,"views","#0E7C73","viewsNow");drawChart("chartSubs",a,"subs","#15171C","subsNow");}
+function renderAgg(){
+  const a=aggregate(gran).slice().reverse(), head=gran==="day"?"날짜":gran==="week"?"주":"월";
+  $("aggTable").innerHTML=`<thead><tr><th>${head}</th><th>조회수</th><th>구독자</th><th>증가</th><th>입금고객</th><th>전환율</th><th>받은금액</th><th>판매</th><th>매출</th><th>판매금액</th></tr></thead><tbody>`+
+    (a.length?a.map(o=>`<tr><td>${o.label}</td><td class="num">${num(o.views)}</td><td class="num">${num(o.subs)}</td><td class="num" style="color:${o.gain>=0?'var(--pos)':'var(--neg)'}">${o.gain>=0?"+":""}${num(o.gain)}</td><td class="num">${num(o.depCust)}</td><td class="num">${pct(o.conv)}</td><td class="money">${fmt(o.received)}</td><td class="num">${num(o.sales)}</td><td class="money">${fmt(o.revenue)}</td><td class="profit">${fmt(o.profit)}</td></tr>`).join("")
+      :`<tr><td colspan="10"><div class="empty"><b>데이터가 없어요</b>일간 입력과 고객을 채우면 채워집니다.</div></td></tr>`)+`</tbody>`;
+}
+function renderDealer(){
+  const ds=S.settings.dealers||[], cap=S.settings.cap||0;
+  const rows=ds.map(d=>{
+    const cs=S.customers.filter(c=>c.dealer===d);
+    const active=cs.filter(c=>c.status!=="sold"&&c.status!=="cancel").length;
+    const sold=cs.filter(c=>c.status==="sold");
+    const profit=sold.reduce((s,c)=>s+(c.profit||0),0);
+    return{d,total:cs.length,active,sold:sold.length,profit,sat:cap>0?active/cap:0};
+  });
+  $("dealerTable").innerHTML=`<thead><tr><th>담당자</th><th>담당 고객</th><th>진행중</th><th>월 케파</th><th>커버리지</th><th>판매</th><th>판매이익</th></tr></thead><tbody>`+
+    (rows.length?rows.map(r=>`<tr><td>${r.d}</td><td class="num">${num(r.total)}</td><td class="num">${num(r.active)}</td><td class="num">${num(cap)}</td><td class="num" style="color:${r.sat>=0.8?'var(--neg)':'var(--pos)'}">${pct(r.sat)}</td><td class="num">${num(r.sold)}</td><td class="profit">${fmt(r.profit)}</td></tr>`).join("")
+      :`<tr><td colspan="7"><div class="empty">설정에서 담당자를 추가하세요.</div></td></tr>`)+`</tbody>`;
+}
+
+/* ---------- 담당자별 진행상황 ---------- */
+function daysAgo(ds){if(!ds)return 0;return Math.floor((new Date(today())-new Date(ds))/864e5);}
+function needsCheck(c){if(c.checked)return false;if(c.status==="lead"&&daysAgo(c.start||c.reg)>=3)return true;if(c.status==="dep"&&daysAgo(c.depdate||c.start||c.reg)>=7)return true;return false;}
+const custMonth=c=>(c.start||c.reg||"").slice(0,7);
+function renderDealerView(){
+  const ds=S.settings.dealers||[];
+  $("dealerChips").innerHTML=["전체",...ds].map(d=>`<button class="chip ${d===curDealer?'on':''}" data-dl="${d}">${d}</button>`).join("");
+  $("dealerChips").querySelectorAll("[data-dl]").forEach(b=>b.onclick=()=>{curDealer=b.dataset.dl;renderDealerView();});
+  const months=[...new Set(S.customers.map(custMonth).filter(Boolean))].sort().reverse();
+  if(!months.includes(curMonth)&&curMonth!=="all")months.unshift(curMonth);
+  $("dealerMonth").innerHTML=`<option value="all"${curMonth==="all"?" selected":""}>전체 기간</option>`+months.map(m=>`<option value="${m}"${m===curMonth?" selected":""}>${Number(m.slice(5,7))}월 (${m.slice(0,4)})</option>`).join("");
+  $("dealerMonth").onchange=()=>{curMonth=$("dealerMonth").value;renderDealerView();};
+  let cs=S.customers.filter(c=>(curDealer==="전체"||c.dealer===curDealer)&&(curMonth==="all"||custMonth(c)===curMonth));
+  const active=cs.filter(c=>c.status!=="sold"&&c.status!=="cancel");
+  const sold=cs.filter(c=>c.status==="sold");
+  const profit=sold.reduce((s,c)=>s+(c.profit||0),0);
+  const need=cs.filter(needsCheck).length;
+  const conv=cs.length?sold.length/cs.length:0;
+  card("dealerKpi",[
+    {l:"담당 고객",v:num(cs.length)+"명"},
+    {l:"진행중",v:num(active.length)+"명"},
+    {l:"판매완료",v:num(sold.length)+"건",cls:"good"},
+    {l:"판매금액",v:fmt(profit),cls:"money"},
+    {l:"성사율",v:pct(conv),d:"판매 ÷ 담당"},
+    {l:"확인 필요",v:num(need)+"명",cls:need>0?"":"good",d:"상담 3일·입금 7일 경과"},
+  ]);
+  const order={lead:0,dep:1,sold:2,cancel:3}, lbl={lead:"상담중",dep:"입금완료",sold:"판매완료",cancel:"취소"};
+  cs=cs.slice().sort((a,b)=>{const n=(needsCheck(b)?1:0)-(needsCheck(a)?1:0);if(n)return n;if(order[a.status]!==order[b.status])return order[a.status]-order[b.status];return(b.reg||"")<(a.reg||"")?-1:1;});
+  $("dealerBoard").innerHTML=`<thead><tr><th>체크</th><th>고객</th><th>연락처</th><th>담당</th><th>상태</th><th>차종</th><th>받은금액</th><th>판매이익</th><th>경과</th></tr></thead><tbody>`+
+    (cs.length?cs.map(c=>{const nc=needsCheck(c);return `<tr class="clk" data-ec="${c.id}">
+      <td><input type="checkbox" data-chk="${c.id}" ${c.checked?"checked":""} style="width:18px;height:18px;cursor:pointer"></td>
+      <td>${nc?'<span class="flag"></span>':""}${c.name||"-"}</td>
+      <td class="num">${c.phone||"-"}</td><td>${c.dealer||"-"}</td>
+      <td><span class="pill ${c.status==="sold"?"p-sold":c.status==="cancel"?"p-cancel":c.status==="dep"?"p-dep":"p-lead"}">${lbl[c.status]||"상담중"}</span></td>
+      <td>${c.car||"-"}</td><td class="money">${fmt(depAmt(c.dep))}</td><td class="profit">${c.profit?fmt(c.profit):"-"}</td>
+      <td class="num" style="color:${nc?"var(--neg)":"var(--muted)"}">${daysAgo(c.reg)}일</td></tr>`;}).join("")
+      :`<tr><td colspan="9"><div class="empty"><b>고객이 없어요</b>고객 장부에서 담당자를 지정해 추가하세요.</div></td></tr>`)+`</tbody>`;
+  $("dealerBoard").querySelectorAll("[data-chk]").forEach(cb=>cb.onclick=async e=>{e.stopPropagation();const c=S.customers.find(x=>x.id===cb.dataset.chk);if(c){c.checked=cb.checked;await save();renderDealerView();}});
+  $("dealerBoard").querySelectorAll("tr.clk").forEach(tr=>tr.onclick=()=>{setView("crm");editCust(tr.dataset.ec);});
+}
+
+/* ---------- 일간 입력 ---------- */
+function renderDaily(){
+  const r=dailyDec().slice().reverse();
+  $("dailyTable").innerHTML=`<thead><tr><th>날짜</th><th>조회수</th><th>구독자</th><th>증가</th><th></th></tr></thead><tbody>`+
+    (r.length?r.map(x=>`<tr class="clk" data-d="${x.date}"><td>${x.date.slice(5).replace("-",".")}</td><td class="num">${num(x.views)}</td><td class="num">${num(x.subs)}</td><td class="num" style="color:${x.gain>=0?'var(--pos)':'var(--neg)'}">${x.gain>=0?"+":""}${num(x.gain)}</td><td><button class="del" data-deld="${x.date}">✕</button></td></tr>`).join("")
+      :`<tr><td colspan="5"><div class="empty"><b>아직 없어요</b>그날 조회수·구독자를 넣어보세요.</div></td></tr>`)+`</tbody>`;
+  $("dailyTable").querySelectorAll("[data-deld]").forEach(b=>b.onclick=async e=>{e.stopPropagation();S.daily=S.daily.filter(x=>x.date!==b.dataset.deld);await save();renderDaily();});
+  $("dailyTable").querySelectorAll("tr.clk").forEach(tr=>tr.onclick=()=>{const x=S.daily.find(d=>d.date===tr.dataset.d);$("d_date").value=x.date;$("d_views").value=x.views||"";$("d_subs").value=x.subs||"";window.scrollTo({top:0,behavior:"smooth"});});
+}
+async function saveDaily(){
+  const date=$("d_date").value;if(!date){toast("날짜를 선택하세요");return;}
+  if(sampleMode){S.customers=[];S.daily=[];sampleMode=false;}
+  const o={date,views:+$("d_views").value||0,subs:+$("d_subs").value||0};
+  const i=S.daily.findIndex(x=>x.date===date);if(i>=0)S.daily[i]=o;else S.daily.push(o);
+  await save();renderDaily();renderDash();toast(date+" 저장됨");$("d_views").value="";$("d_subs").value="";
+}
+
+/* ---------- 고객 ---------- */
+function fillDealerSelect(){
+  $("c_dealer").innerHTML=(S.settings.dealers||[]).map(d=>`<option>${d}</option>`).join("");
+}
+function toggleSale(){$("saleFields").style.display=$("c_status").value==="sold"?"grid":"none";}
+function cReceived(){$("c_received").textContent=fmt(depAmt($("c_dep").value));}
+function saleProfit(){return (+$("c_margin").value||0)+(+$("c_fee").value||0)-(+$("c_service").value||0);}
+function cSaleTotal(){$("c_saleTotal").textContent=fmt(saleProfit());}
+function renderCRM(){
+  fillDealerSelect();
+  const cs=[...S.customers].sort((a,b)=>(b.reg||"")<(a.reg||"")?-1:1);
+  const badge=c=>c.status==="sold"?'<span class="pill p-sold">판매완료</span>':c.status==="cancel"?'<span class="pill p-cancel">취소</span>':c.status==="dep"?'<span class="pill p-dep">입금</span>':'<span class="pill p-lead">상담중</span>';
+  $("crmTable").innerHTML=`<thead><tr><th>등록일</th><th>착수일</th><th>고객</th><th>연락처</th><th>입금자</th><th>담당</th><th>받은금액</th><th>상태</th><th>차종</th><th>차금액</th><th>판매금액</th><th></th></tr></thead><tbody>`+
+    (cs.length?cs.map(c=>`<tr class="clk" data-id="${c.id}"><td>${(c.reg||"").slice(5).replace("-",".")}</td><td>${(c.start||"").slice(5).replace("-",".")||"-"}</td><td>${c.name||"-"}</td><td class="num">${c.phone||"-"}</td><td>${c.payer||"-"}</td><td>${c.dealer||"-"}</td><td class="money">${fmt(depAmt(c.dep))}</td><td>${badge(c)}</td><td>${c.car||"-"}</td><td class="num">${c.price?fmt(c.price):"-"}</td><td class="profit">${c.profit?fmt(c.profit):"-"}</td><td><button class="del" data-delc="${c.id}">✕</button></td></tr>`).join("")
+      :`<tr><td colspan="12"><div class="empty"><b>고객이 없어요</b>위에서 고객을 추가하면 KPI에 자동 반영됩니다.</div></td></tr>`)+`</tbody>`;
+  $("crmTable").querySelectorAll("[data-delc]").forEach(b=>b.onclick=async e=>{e.stopPropagation();S.customers=S.customers.filter(c=>c.id!==b.dataset.delc);await save();renderCRM();renderDash();});
+  $("crmTable").querySelectorAll("tr.clk").forEach(tr=>tr.onclick=()=>editCust(tr.dataset.id));
+}
+function clearCRMForm(){editId=null;$("crmFormTitle").textContent="고객 추가";$("c_cancel").classList.add("hide");
+  $("c_reg").value=today();$("c_start").value=today();["c_name","c_phone","c_payer","c_car"].forEach(i=>$(i).value="");
+  $("c_dealer").selectedIndex=0;$("c_dep").value="none";$("c_depdate").value=today();$("c_status").value="lead";
+  ["c_solddate","c_price","c_margin","c_fee","c_service"].forEach(i=>$(i).value="");toggleSale();cReceived();cSaleTotal();}
+function editCust(id){const c=S.customers.find(x=>x.id===id);if(!c)return;editId=id;
+  $("crmFormTitle").textContent="고객 수정";$("c_cancel").classList.remove("hide");
+  $("c_reg").value=c.reg||today();$("c_start").value=c.start||c.reg||today();$("c_name").value=c.name||"";$("c_phone").value=c.phone||"";$("c_payer").value=c.payer||"";
+  fillDealerSelect();$("c_dealer").value=c.dealer||"";$("c_dep").value=c.dep||"none";$("c_depdate").value=c.depdate||"";
+  $("c_status").value=c.status||"lead";$("c_solddate").value=c.solddate||"";$("c_car").value=c.car||"";
+  $("c_price").value=c.price||"";$("c_margin").value=c.margin||"";$("c_fee").value=c.fee||"";$("c_service").value=c.service||"";
+  toggleSale();cReceived();cSaleTotal();window.scrollTo({top:0,behavior:"smooth"});}
+async function saveCust(){
+  const name=$("c_name").value.trim();if(!name){toast("고객명을 입력하세요");return;}
+  if(sampleMode){S.customers=[];S.daily=[];sampleMode=false;}
+  const margin=+$("c_margin").value||0, fee=+$("c_fee").value||0, service=+$("c_service").value||0, price=+$("c_price").value||0;
+  const o={id:editId||("c"+Date.now()),reg:$("c_reg").value||today(),start:$("c_start").value||today(),name,phone:$("c_phone").value.trim(),
+    payer:$("c_payer").value.trim(),dealer:$("c_dealer").value,dep:$("c_dep").value,depdate:$("c_depdate").value,
+    status:$("c_status").value,solddate:$("c_solddate").value,car:$("c_car").value.trim(),
+    price,margin,fee,service,profit:margin+fee-service};
+  if(o.status==="sold"&&!o.solddate)o.solddate=today();
+  if(!editId){const ex=findByPhone(o.phone);if(ex)o.id=ex.id;}
+  const prev=S.customers.find(c=>c.id===o.id);o.checked=prev?!!prev.checked:false;
+  const i=S.customers.findIndex(c=>c.id===o.id);if(i>=0)S.customers[i]=o;else S.customers.push(o);
+  await save();clearCRMForm();renderCRM();renderDash();toast(i>=0?"수정됨":"고객 저장됨");
+}
+
+/* ---------- 설정 ---------- */
+const COST_HDR=`<div style="display:grid;grid-template-columns:1fr 160px 38px;gap:10px;margin-bottom:6px;font-size:11.5px;color:var(--muted);font-weight:700"><div>항목</div><div>월 금액 (원)</div><div></div></div>`;
+const costRow=(c,i)=>`<div style="display:grid;grid-template-columns:1fr 160px 38px;gap:10px;margin-bottom:8px;align-items:center">
+  <input type="text" value="${(c.name||"").replace(/"/g,"&quot;")}" data-n="${i}" placeholder="예: 임대료">
+  <input type="number" min="0" value="${c.amount||0}" data-a="${i}">
+  <button class="del" data-d="${i}">✕</button></div>`;
+function renderFixedList(){
+  const cs=S.settings.fixedCosts=S.settings.fixedCosts||[];
+  $("fixedList").innerHTML=COST_HDR+(cs.length?cs.map(costRow).join(""):`<div style="padding:16px;text-align:center;color:var(--muted)">＋ 고정비 항목 추가를 눌러 임대료·인건비 등을 적어주세요.</div>`);
+  $("sumFixed").textContent=fmt(fixedTotal());
+  $("fixedList").querySelectorAll("[data-n]").forEach(inp=>inp.onchange=async()=>{cs[+inp.dataset.n].name=inp.value.trim();await save();});
+  $("fixedList").querySelectorAll("[data-a]").forEach(inp=>inp.onchange=async()=>{cs[+inp.dataset.a].amount=+inp.value||0;await save();renderFixedList();renderDash();});
+  $("fixedList").querySelectorAll("[data-d]").forEach(b=>b.onclick=async()=>{cs.splice(+b.dataset.d,1);await save();renderFixedList();renderDash();});
+}
+function renderVarList(){
+  const months=allMonths();
+  if(!months.includes(setMonth))setMonth=today().slice(0,7);
+  $("varMonth").innerHTML=months.map(m=>`<option value="${m}"${m===setMonth?" selected":""}>${m.slice(0,4)}년 ${Number(m.slice(5,7))}월</option>`).join("");
+  $("varMonth").onchange=()=>{setMonth=$("varMonth").value;renderVarList();};
+  $("copyPrevVar").onclick=async()=>{
+    const pm=prevMonth(setMonth), src=varCosts(pm);
+    if(!src.length){toast(Number(pm.slice(5,7))+"월 변동비가 없어요");return;}
+    S.settings.varByMonth[setMonth]=src.map(c=>({name:c.name,amount:c.amount}));
+    await save();renderVarList();renderDash();toast(Number(pm.slice(5,7))+"월에서 복사됨");
+  };
+  const cs=varCosts(setMonth);
+  $("varList").innerHTML=COST_HDR+(cs.length?cs.map(costRow).join(""):`<div style="padding:16px;text-align:center;color:var(--muted)">이 달 변동비가 없어요. ＋ 추가 또는 '이전 달 복사'를 눌러주세요.</div>`);
+  $("sumVar").textContent=fmt(varTotal(setMonth));
+  const arr=()=>S.settings.varByMonth[setMonth];
+  $("varList").querySelectorAll("[data-n]").forEach(inp=>inp.onchange=async()=>{arr()[+inp.dataset.n].name=inp.value.trim();await save();});
+  $("varList").querySelectorAll("[data-a]").forEach(inp=>inp.onchange=async()=>{arr()[+inp.dataset.a].amount=+inp.value||0;await save();renderVarList();renderDash();});
+  $("varList").querySelectorAll("[data-d]").forEach(b=>b.onclick=async()=>{arr().splice(+b.dataset.d,1);await save();renderVarList();renderDash();});
+}
+function renderSet(){
+  const st=S.settings;$("s_cap").value=st.cap;
+  renderFixedList(); renderVarList();
+  $("dealerList").innerHTML=(st.dealers||[]).map((d,i)=>`<div class="field" style="flex-direction:row;align-items:center;gap:6px"><input value="${d}" data-di="${i}"><button class="del" data-deldealer="${i}">✕</button></div>`).join("");
+  $("dealerList").querySelectorAll("input[data-di]").forEach(inp=>inp.onchange=async()=>{st.dealers[+inp.dataset.di]=inp.value.trim();await save();renderDash();});
+  $("dealerList").querySelectorAll("[data-deldealer]").forEach(b=>b.onclick=async()=>{st.dealers.splice(+b.dataset.deldealer,1);await save();renderSet();renderDash();});
+  $("s_cap").onchange=async()=>{st.cap=+$("s_cap").value||0;await save();renderDash();};
+}
+
+/* ---------- 공통 ---------- */
+function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1700);}
+function setView(v){view=v;["dash","full","daily","crm","dealer","set"].forEach(x=>$("view-"+x).classList.toggle("hide",x!==v));
+  $("nav").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+  if(v==="dash")renderDash();if(v==="full")renderFull();if(v==="daily")renderDaily();if(v==="crm"){renderCRM();}if(v==="dealer")renderDealerView();if(v==="set")renderSet();}
+function fmtCol(ws,c,z){const ref=XLSX.utils.decode_range(ws["!ref"]);for(let r=1;r<=ref.e.r;r++){const cell=ws[XLSX.utils.encode_cell({r,c})];if(cell&&typeof cell.v==="number")cell.z=z;}}
+function exportXLSX(){
+  if(typeof XLSX==="undefined"){toast("엑셀 모듈 로딩 중 · 잠시 후 다시 눌러주세요");return;}
+  const wb=XLSX.utils.book_new(), fx=fixedTotal();
+  // 1) 월별 KPI
+  const months=allMonths().slice().sort();
+  const kHead=["월","조회수","신규구독","누적구독","입금고객","전환율","받은금액","판매건수","매출","판매금액","고정비","변동비","영업이익","영업이익률","CAC"];
+  const kRows=months.map(mk=>{const m=monthSlice(mk),vt=varTotal(mk),op=m.gross-fx-vt;
+    return[mk,m.views,m.gain,m.subs,m.depCust,m.views>0?m.depCust/m.views:0,m.received,m.sales,m.revenue,m.gross,fx,vt,op,m.revenue>0?op/m.revenue:0,m.sales>0?vt/m.sales:0];});
+  const ws1=XLSX.utils.aoa_to_sheet([kHead,...kRows]);
+  ws1["!cols"]=kHead.map((h,i)=>({wch:i===0?9:12}));
+  fmtCol(ws1,5,"0.00%");fmtCol(ws1,13,"0.00%");[6,8,9,10,11,12,14].forEach(c=>fmtCol(ws1,c,"#,##0"));
+  XLSX.utils.book_append_sheet(wb,ws1,"월별 KPI");
+  // 2) 일간 원자료
+  const dd=dailyDec();
+  const ws2=XLSX.utils.aoa_to_sheet([["날짜","조회수","누적구독자","구독자증가"],...dd.map(x=>[x.date,x.views,x.subs,x.gain])]);
+  ws2["!cols"]=[{wch:12},{wch:10},{wch:12},{wch:10}];
+  XLSX.utils.book_append_sheet(wb,ws2,"일간 원자료");
+  // 3) 고객 원자료
+  const dl={none:"없음",res:"예약금",down:"선수금",both:"예약+선수"}, sl={lead:"상담중",dep:"입금완료",sold:"판매완료",cancel:"취소"};
+  const cHead=["등록일","착수일","고객명","연락처","입금자","담당","입금유형","입금일","받은금액","상태","판매일","차종","차금액","차마진","수수료","서비스","판매금액"];
+  const cRows=[...S.customers].sort((a,b)=>(a.reg||"")<(b.reg||"")?-1:1).map(c=>[c.reg||"",c.start||"",c.name||"",c.phone||"",c.payer||"",c.dealer||"",dl[c.dep]||"없음",c.depdate||"",depAmt(c.dep),sl[c.status]||"",c.solddate||"",c.car||"",c.price||0,c.margin||0,c.fee||0,c.service||0,c.profit||0]);
+  const ws3=XLSX.utils.aoa_to_sheet([cHead,...cRows]);
+  ws3["!cols"]=[10,10,11,15,11,9,11,11,12,9,11,16,13,12,10,10,12].map(w=>({wch:w}));
+  [8,12,13,14,15,16].forEach(c=>fmtCol(ws3,c,"#,##0"));
+  XLSX.utils.book_append_sheet(wb,ws3,"고객 원자료");
+  // 4) 비용
+  const ca=[["[고정비] 매달 동일 적용",""]];
+  (S.settings.fixedCosts||[]).forEach(c=>ca.push([c.name||"",c.amount||0]));
+  ca.push(["고정비 합",fixedTotal()],[]);
+  ca.push(["[변동비] 월별",""]);
+  Object.keys(S.settings.varByMonth||{}).sort().forEach(mk=>{ca.push(["▶ "+mk,""]);varCosts(mk).forEach(c=>ca.push([c.name||"",c.amount||0]));ca.push([mk+" 합",varTotal(mk)]);});
+  const ws4=XLSX.utils.aoa_to_sheet(ca);ws4["!cols"]=[{wch:26},{wch:14}];fmtCol(ws4,1,"#,##0");
+  XLSX.utils.book_append_sheet(wb,ws4,"비용");
+  XLSX.writeFile(wb,"겁쟁이딜러_KPI_"+today()+".xlsx");
+  toast("Excel 파일을 내려받았습니다");
+}
+function exportCSV(){
+  const a=aggregate("day");const head=["날짜","조회수","구독자","구독자증가","입금고객","전환율","받은금액","판매","매출","판매금액합"];
+  const lines=[head.join(",")].concat(a.map(o=>[o.key,o.views,o.subs,o.gain,o.depCust,(o.conv*100).toFixed(2)+"%",o.received,o.sales,o.revenue,o.profit].join(",")));
+  lines.push("");lines.push(["등록일","착수일","고객명","연락처","입금자","담당","받은금액","상태","판매일","차종","차금액","차마진","수수료","서비스","판매금액"].join(","));
+  S.customers.forEach(c=>lines.push([c.reg,c.start||"",c.name,c.phone,c.payer,c.dealer,depAmt(c.dep),c.status,c.solddate,c.car,c.price||0,c.margin||0,c.fee||0,c.service||0,c.profit||0].join(",")));
+  const blob=new Blob(["\ufeff"+lines.join("\n")],{type:"text/csv;charset=utf-8"});
+  const a2=document.createElement("a");a2.href=URL.createObjectURL(blob);a2.download="겁쟁이딜러_KPI_"+today()+".csv";a2.click();
+}
+
+/* ---------- 이벤트 ---------- */
+$("nav").querySelectorAll("button").forEach(b=>b.onclick=()=>setView(b.dataset.v));
+$("dashTabs").querySelectorAll("button").forEach(b=>b.onclick=()=>{gran=b.dataset.g;$("dashTabs").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));renderCharts();renderAgg();});
+$("d_save").onclick=saveDaily;
+$("c_save").onclick=saveCust;
+$("c_cancel").onclick=clearCRMForm;
+$("c_dep").addEventListener("change",cReceived);
+$("c_status").addEventListener("change",toggleSale);
+["c_margin","c_fee","c_service"].forEach(id=>$(id).addEventListener("input",cSaleTotal));
+$("c_phone").addEventListener("change",()=>{
+  if(editId)return;
+  const c=findByPhone($("c_phone").value);
+  if(c){editCust(c.id);toast(c.name+" 고객을 불러왔어요 · 판매정보만 입력하세요");}
+});
+$("addDealer").onclick=async()=>{const n=$("newDealer").value.trim();if(!n)return;S.settings.dealers.push(n);$("newDealer").value="";await save();renderSet();renderDash();};
+$("addFixed").onclick=async()=>{(S.settings.fixedCosts=S.settings.fixedCosts||[]).push({name:"",amount:0});await save();renderFixedList();};
+$("addVar").onclick=async()=>{const vb=S.settings.varByMonth;(vb[setMonth]=vb[setMonth]||[]).push({name:"",amount:0});await save();renderVarList();};
+$("exportBtn").onclick=exportCSV;
+$("xlsxBtn").onclick=exportXLSX;
+$("clearBtn").onclick=async()=>{if(confirm("모든 기록을 지울까요? 되돌릴 수 없습니다.")){S={daily:[],customers:[],settings:S.settings};sampleMode=false;await save();setView(view);}};
+$("clearSample").onclick=async()=>{S={daily:[],customers:[],settings:S.settings};sampleMode=false;await save();setView(view);toast("예시를 비웠습니다");};
+
+$("refreshBtn").onclick=()=>{if(sb){refresh();toast("새로고침했습니다");}else{toast("아직 공유 DB가 연결되지 않았어요");}};
+(async()=>{
+  if(SB_URL&&SB_KEY&&window.supabase){try{sb=window.supabase.createClient(SB_URL,SB_KEY);}catch(e){sb=null;}}
+  await load();
+  $("d_date").value=today();clearCRMForm();
+  $("sampleBanner").classList.toggle("hide",!sampleMode);
+  setSync(!!sb);
+  setView("dash");
+  if(sb){setInterval(refresh,20000);window.addEventListener("focus",refresh);}
+})();
+</script>
