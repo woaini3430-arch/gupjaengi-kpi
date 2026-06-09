@@ -101,6 +101,7 @@
       <div class="sub">매일 숫자 + 고객만 넣으면 주간·월간·KPI가 자동으로 정리됩니다</div>
     </div>
     <div class="toolbar">
+      <input id="editorName" placeholder="내 이름" title="여기 이름을 적으면 수정 기록에 남습니다" style="font-family:var(--kr);font-size:13px;font-weight:600;width:92px;padding:7px 10px;border:1px solid var(--line);border-radius:10px;align-self:center">
       <span id="syncStatus" style="font-size:12px;font-weight:700;align-self:center;margin-right:4px">○ 이 기기에만 저장</span>
       <button class="btn" id="refreshBtn">새로고침</button>
       <button class="btn" id="xlsxBtn">Excel 내보내기</button>
@@ -121,6 +122,7 @@
     <button data-v="crm">고객 장부</button>
     <button data-v="dealer">담당자</button>
     <button data-v="set">설정</button>
+    <button data-v="log">수정 기록</button>
   </div>
 
   <!-- ============ 대시보드 ============ -->
@@ -251,6 +253,14 @@
       </div>
     </div>
   </div>
+
+  <!-- ============ 수정 기록 ============ -->
+  <div id="view-log" class="hide">
+    <div class="banner" style="background:var(--teal-bg);border-color:#bfe0db;color:#0a5650">
+      <span>링크를 가진 누구나 수정할 수 있어요. 각자 우상단에 <b>이름</b>을 적어두면 아래에 누가·언제·무엇을 바꿨는지 남습니다. (로그인이 아니라서 이름은 본인이 적는 방식이에요)</span>
+    </div>
+    <div class="panel"><div class="ptitle">수정 기록 <span style="font-weight:600;color:var(--muted)">· 최근 300건 (최신이 위)</span></div><div class="tscroll"><table id="logTable"></table></div></div>
+  </div>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -268,6 +278,12 @@ let S={daily:[],customers:[],settings:{}}, view="dash", gran="day", sampleMode=f
 const SB_URL = "";   /* 예: https://abcd1234.supabase.co */
 const SB_KEY = "";   /* anon public key */
 let sb=null;
+
+/* ===== 수정 기록 — 각자 이름을 적어두면 저장 시 누가·언제·무엇을 남김 (로그인 아님) ===== */
+const EDITOR_KEY="kkepjangi:editor";
+let editor=(()=>{try{return localStorage.getItem(EDITOR_KEY)||"";}catch(e){return "";}})();
+function setEditor(n){editor=(n||"").trim();try{localStorage.setItem(EDITOR_KEY,editor);}catch(e){}}
+function logAction(action){if(!action)return;(S.log=S.log||[]).push({who:editor||"익명",at:new Date().toISOString(),action});if(S.log.length>300)S.log=S.log.slice(-300);}
 
 const depAmt=t=>t==="res"?RES:t==="down"?DOWN:t==="both"?RES+DOWN:0;
 const digits=s=>(s||"").replace(/\D/g,"");
@@ -315,7 +331,8 @@ function allMonths(){
   Object.keys(S.settings.varByMonth||{}).forEach(k=>s.add(k));
   return [...s].filter(Boolean).sort().reverse();
 }
-async function save(){
+async function save(action){
+  if(action)logAction(action);
   S.daily.sort((a,b)=>a.date<b.date?-1:1);
   if(sb){
     try{const{error}=await sb.from("app_state").upsert({id:"main",data:S,updated_at:new Date().toISOString()});if(error)throw error;setSync(true);return;}catch(e){setSync(false);}
@@ -545,7 +562,7 @@ function renderDealerView(){
       <td>${c.car||"-"}</td><td class="money">${fmt(depAmt(c.dep))}</td><td class="profit">${c.profit?fmt(c.profit):"-"}</td>
       <td class="num" style="color:${nc?"var(--neg)":"var(--muted)"}">${daysAgo(c.reg)}일</td></tr>`;}).join("")
       :`<tr><td colspan="9"><div class="empty"><b>고객이 없어요</b>고객 장부에서 담당자를 지정해 추가하세요.</div></td></tr>`)+`</tbody>`;
-  $("dealerBoard").querySelectorAll("[data-chk]").forEach(cb=>cb.onclick=async e=>{e.stopPropagation();const c=S.customers.find(x=>x.id===cb.dataset.chk);if(c){c.checked=cb.checked;await save();renderDealerView();}});
+  $("dealerBoard").querySelectorAll("[data-chk]").forEach(cb=>cb.onclick=async e=>{e.stopPropagation();const c=S.customers.find(x=>x.id===cb.dataset.chk);if(c){c.checked=cb.checked;await save("확인체크 "+(c.name||"")+(cb.checked?" ✔":" 해제"));renderDealerView();}});
   $("dealerBoard").querySelectorAll("tr.clk").forEach(tr=>tr.onclick=()=>{setView("crm");editCust(tr.dataset.ec);});
 }
 
@@ -555,7 +572,7 @@ function renderDaily(){
   $("dailyTable").innerHTML=`<thead><tr><th>날짜</th><th>조회수</th><th>구독자</th><th>증가</th><th></th></tr></thead><tbody>`+
     (r.length?r.map(x=>`<tr class="clk" data-d="${x.date}"><td>${x.date.slice(5).replace("-",".")}</td><td class="num">${num(x.views)}</td><td class="num">${num(x.subs)}</td><td class="num" style="color:${x.gain>=0?'var(--pos)':'var(--neg)'}">${x.gain>=0?"+":""}${num(x.gain)}</td><td><button class="del" data-deld="${x.date}">✕</button></td></tr>`).join("")
       :`<tr><td colspan="5"><div class="empty"><b>아직 없어요</b>그날 조회수·구독자를 넣어보세요.</div></td></tr>`)+`</tbody>`;
-  $("dailyTable").querySelectorAll("[data-deld]").forEach(b=>b.onclick=async e=>{e.stopPropagation();S.daily=S.daily.filter(x=>x.date!==b.dataset.deld);await save();renderDaily();});
+  $("dailyTable").querySelectorAll("[data-deld]").forEach(b=>b.onclick=async e=>{e.stopPropagation();S.daily=S.daily.filter(x=>x.date!==b.dataset.deld);await save("일간 삭제 "+b.dataset.deld);renderDaily();});
   $("dailyTable").querySelectorAll("tr.clk").forEach(tr=>tr.onclick=()=>{const x=S.daily.find(d=>d.date===tr.dataset.d);$("d_date").value=x.date;$("d_views").value=x.views||"";$("d_subs").value=x.subs||"";window.scrollTo({top:0,behavior:"smooth"});});
 }
 async function saveDaily(){
@@ -563,7 +580,7 @@ async function saveDaily(){
   if(sampleMode){S.customers=[];S.daily=[];sampleMode=false;}
   const o={date,views:+$("d_views").value||0,subs:+$("d_subs").value||0};
   const i=S.daily.findIndex(x=>x.date===date);if(i>=0)S.daily[i]=o;else S.daily.push(o);
-  await save();renderDaily();renderDash();toast(date+" 저장됨");$("d_views").value="";$("d_subs").value="";
+  await save("일간 입력 "+date);renderDaily();renderDash();toast(date+" 저장됨");$("d_views").value="";$("d_subs").value="";
 }
 
 /* ---------- 고객 ---------- */
@@ -581,7 +598,7 @@ function renderCRM(){
   $("crmTable").innerHTML=`<thead><tr><th>등록일</th><th>착수일</th><th>고객</th><th>연락처</th><th>입금자</th><th>담당</th><th>받은금액</th><th>상태</th><th>차종</th><th>차금액</th><th>판매금액</th><th></th></tr></thead><tbody>`+
     (cs.length?cs.map(c=>`<tr class="clk" data-id="${c.id}"><td>${(c.reg||"").slice(5).replace("-",".")}</td><td>${(c.start||"").slice(5).replace("-",".")||"-"}</td><td>${c.name||"-"}</td><td class="num">${c.phone||"-"}</td><td>${c.payer||"-"}</td><td>${c.dealer||"-"}</td><td class="money">${fmt(depAmt(c.dep))}</td><td>${badge(c)}</td><td>${c.car||"-"}</td><td class="num">${c.price?fmt(c.price):"-"}</td><td class="profit">${c.profit?fmt(c.profit):"-"}</td><td><button class="del" data-delc="${c.id}">✕</button></td></tr>`).join("")
       :`<tr><td colspan="12"><div class="empty"><b>고객이 없어요</b>위에서 고객을 추가하면 KPI에 자동 반영됩니다.</div></td></tr>`)+`</tbody>`;
-  $("crmTable").querySelectorAll("[data-delc]").forEach(b=>b.onclick=async e=>{e.stopPropagation();S.customers=S.customers.filter(c=>c.id!==b.dataset.delc);await save();renderCRM();renderDash();});
+  $("crmTable").querySelectorAll("[data-delc]").forEach(b=>b.onclick=async e=>{e.stopPropagation();const _dc=S.customers.find(c=>c.id===b.dataset.delc);S.customers=S.customers.filter(c=>c.id!==b.dataset.delc);await save("고객 삭제 "+((_dc&&_dc.name)||""));renderCRM();renderDash();});
   $("crmTable").querySelectorAll("tr.clk").forEach(tr=>tr.onclick=()=>editCust(tr.dataset.id));
 }
 function clearCRMForm(){editId=null;$("crmFormTitle").textContent="고객 추가";$("c_cancel").classList.add("hide");
@@ -607,7 +624,7 @@ async function saveCust(){
   if(!editId){const ex=findByPhone(o.phone);if(ex)o.id=ex.id;}
   const prev=S.customers.find(c=>c.id===o.id);o.checked=prev?!!prev.checked:false;
   const i=S.customers.findIndex(c=>c.id===o.id);if(i>=0)S.customers[i]=o;else S.customers.push(o);
-  await save();clearCRMForm();renderCRM();renderDash();toast(i>=0?"수정됨":"고객 저장됨");
+  await save((i>=0?"고객 수정 ":"고객 추가 ")+name);clearCRMForm();renderCRM();renderDash();toast(i>=0?"수정됨":"고객 저장됨");
 }
 
 /* ---------- 설정 ---------- */
@@ -621,8 +638,8 @@ function renderFixedList(){
   $("fixedList").innerHTML=COST_HDR+(cs.length?cs.map(costRow).join(""):`<div style="padding:16px;text-align:center;color:var(--muted)">＋ 고정비 항목 추가를 눌러 임대료·인건비 등을 적어주세요.</div>`);
   $("sumFixed").textContent=fmt(fixedTotal());
   $("fixedList").querySelectorAll("[data-n]").forEach(inp=>inp.onchange=async()=>{cs[+inp.dataset.n].name=inp.value.trim();await save();});
-  $("fixedList").querySelectorAll("[data-a]").forEach(inp=>inp.onchange=async()=>{cs[+inp.dataset.a].amount=+inp.value||0;await save();renderFixedList();renderDash();});
-  $("fixedList").querySelectorAll("[data-d]").forEach(b=>b.onclick=async()=>{cs.splice(+b.dataset.d,1);await save();renderFixedList();renderDash();});
+  $("fixedList").querySelectorAll("[data-a]").forEach(inp=>inp.onchange=async()=>{cs[+inp.dataset.a].amount=+inp.value||0;await save("고정비 수정");renderFixedList();renderDash();});
+  $("fixedList").querySelectorAll("[data-d]").forEach(b=>b.onclick=async()=>{cs.splice(+b.dataset.d,1);await save("고정비 삭제");renderFixedList();renderDash();});
 }
 function renderVarList(){
   const months=allMonths();
@@ -633,30 +650,39 @@ function renderVarList(){
     const pm=prevMonth(setMonth), src=varCosts(pm);
     if(!src.length){toast(Number(pm.slice(5,7))+"월 변동비가 없어요");return;}
     S.settings.varByMonth[setMonth]=src.map(c=>({name:c.name,amount:c.amount}));
-    await save();renderVarList();renderDash();toast(Number(pm.slice(5,7))+"월에서 복사됨");
+    await save("변동비 복사 "+setMonth);renderVarList();renderDash();toast(Number(pm.slice(5,7))+"월에서 복사됨");
   };
   const cs=varCosts(setMonth);
   $("varList").innerHTML=COST_HDR+(cs.length?cs.map(costRow).join(""):`<div style="padding:16px;text-align:center;color:var(--muted)">이 달 변동비가 없어요. ＋ 추가 또는 '이전 달 복사'를 눌러주세요.</div>`);
   $("sumVar").textContent=fmt(varTotal(setMonth));
   const arr=()=>S.settings.varByMonth[setMonth];
   $("varList").querySelectorAll("[data-n]").forEach(inp=>inp.onchange=async()=>{arr()[+inp.dataset.n].name=inp.value.trim();await save();});
-  $("varList").querySelectorAll("[data-a]").forEach(inp=>inp.onchange=async()=>{arr()[+inp.dataset.a].amount=+inp.value||0;await save();renderVarList();renderDash();});
-  $("varList").querySelectorAll("[data-d]").forEach(b=>b.onclick=async()=>{arr().splice(+b.dataset.d,1);await save();renderVarList();renderDash();});
+  $("varList").querySelectorAll("[data-a]").forEach(inp=>inp.onchange=async()=>{arr()[+inp.dataset.a].amount=+inp.value||0;await save("변동비 수정");renderVarList();renderDash();});
+  $("varList").querySelectorAll("[data-d]").forEach(b=>b.onclick=async()=>{arr().splice(+b.dataset.d,1);await save("변동비 삭제");renderVarList();renderDash();});
 }
 function renderSet(){
   const st=S.settings;$("s_cap").value=st.cap;
   renderFixedList(); renderVarList();
   $("dealerList").innerHTML=(st.dealers||[]).map((d,i)=>`<div class="field" style="flex-direction:row;align-items:center;gap:6px"><input value="${d}" data-di="${i}"><button class="del" data-deldealer="${i}">✕</button></div>`).join("");
-  $("dealerList").querySelectorAll("input[data-di]").forEach(inp=>inp.onchange=async()=>{st.dealers[+inp.dataset.di]=inp.value.trim();await save();renderDash();});
-  $("dealerList").querySelectorAll("[data-deldealer]").forEach(b=>b.onclick=async()=>{st.dealers.splice(+b.dataset.deldealer,1);await save();renderSet();renderDash();});
-  $("s_cap").onchange=async()=>{st.cap=+$("s_cap").value||0;await save();renderDash();};
+  $("dealerList").querySelectorAll("input[data-di]").forEach(inp=>inp.onchange=async()=>{st.dealers[+inp.dataset.di]=inp.value.trim();await save("담당자 수정");renderDash();});
+  $("dealerList").querySelectorAll("[data-deldealer]").forEach(b=>b.onclick=async()=>{st.dealers.splice(+b.dataset.deldealer,1);await save("담당자 삭제");renderSet();renderDash();});
+  $("s_cap").onchange=async()=>{st.cap=+$("s_cap").value||0;await save("케파 변경 "+st.cap);renderDash();};
+}
+
+/* ---------- 수정 기록 ---------- */
+function renderLog(){
+  const L=(S.log||[]).slice().reverse();
+  const when=iso=>{const d=new Date(iso);const p=n=>String(n).padStart(2,"0");return (d.getMonth()+1)+"/"+d.getDate()+" "+p(d.getHours())+":"+p(d.getMinutes());};
+  $("logTable").innerHTML=`<thead><tr><th>시각</th><th>사람</th><th>작업</th></tr></thead><tbody>`+
+    (L.length?L.map(e=>`<tr><td class="num">${when(e.at)}</td><td>${e.who||"익명"}</td><td style="text-align:left">${e.action||""}</td></tr>`).join("")
+      :`<tr><td colspan="3"><div class="empty"><b>아직 기록이 없어요</b>우상단에 이름을 적고 무언가 저장하면 누가 언제 바꿨는지 쌓입니다.</div></td></tr>`)+`</tbody>`;
 }
 
 /* ---------- 공통 ---------- */
 function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1700);}
-function setView(v){view=v;["dash","full","daily","crm","dealer","set"].forEach(x=>$("view-"+x).classList.toggle("hide",x!==v));
+function setView(v){view=v;["dash","full","daily","crm","dealer","set","log"].forEach(x=>$("view-"+x).classList.toggle("hide",x!==v));
   $("nav").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
-  if(v==="dash")renderDash();if(v==="full")renderFull();if(v==="daily")renderDaily();if(v==="crm"){renderCRM();}if(v==="dealer")renderDealerView();if(v==="set")renderSet();}
+  if(v==="dash")renderDash();if(v==="full")renderFull();if(v==="daily")renderDaily();if(v==="crm"){renderCRM();}if(v==="dealer")renderDealerView();if(v==="set")renderSet();if(v==="log")renderLog();}
 function fmtCol(ws,c,z){const ref=XLSX.utils.decode_range(ws["!ref"]);for(let r=1;r<=ref.e.r;r++){const cell=ws[XLSX.utils.encode_cell({r,c})];if(cell&&typeof cell.v==="number")cell.z=z;}}
 function exportXLSX(){
   if(typeof XLSX==="undefined"){toast("엑셀 모듈 로딩 중 · 잠시 후 다시 눌러주세요");return;}
@@ -717,18 +743,20 @@ $("c_phone").addEventListener("change",()=>{
   const c=findByPhone($("c_phone").value);
   if(c){editCust(c.id);toast(c.name+" 고객을 불러왔어요 · 판매정보만 입력하세요");}
 });
-$("addDealer").onclick=async()=>{const n=$("newDealer").value.trim();if(!n)return;S.settings.dealers.push(n);$("newDealer").value="";await save();renderSet();renderDash();};
+$("addDealer").onclick=async()=>{const n=$("newDealer").value.trim();if(!n)return;S.settings.dealers.push(n);$("newDealer").value="";await save("담당자 추가 "+n);renderSet();renderDash();};
 $("addFixed").onclick=async()=>{(S.settings.fixedCosts=S.settings.fixedCosts||[]).push({name:"",amount:0});await save();renderFixedList();};
 $("addVar").onclick=async()=>{const vb=S.settings.varByMonth;(vb[setMonth]=vb[setMonth]||[]).push({name:"",amount:0});await save();renderVarList();};
 $("exportBtn").onclick=exportCSV;
 $("xlsxBtn").onclick=exportXLSX;
-$("clearBtn").onclick=async()=>{if(confirm("모든 기록을 지울까요? 되돌릴 수 없습니다.")){S={daily:[],customers:[],settings:S.settings};sampleMode=false;await save();setView(view);}};
+$("clearBtn").onclick=async()=>{if(confirm("모든 기록을 지울까요? 되돌릴 수 없습니다.")){S={daily:[],customers:[],settings:S.settings};sampleMode=false;await save("전체 비우기");setView(view);}};
 $("clearSample").onclick=async()=>{S={daily:[],customers:[],settings:S.settings};sampleMode=false;await save();setView(view);toast("예시를 비웠습니다");};
 
 $("refreshBtn").onclick=()=>{if(sb){refresh();toast("새로고침했습니다");}else{toast("아직 공유 DB가 연결되지 않았어요");}};
 (async()=>{
   if(SB_URL&&SB_KEY&&window.supabase){try{sb=window.supabase.createClient(SB_URL,SB_KEY);}catch(e){sb=null;}}
   await load();
+  $("editorName").value=editor;
+  $("editorName").addEventListener("change",()=>setEditor($("editorName").value));
   $("d_date").value=today();clearCRMForm();
   $("sampleBanner").classList.toggle("hide",!sampleMode);
   setSync(!!sb);

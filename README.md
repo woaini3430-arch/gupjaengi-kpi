@@ -17,7 +17,11 @@ CAC, LTV, 케파 포화도 등)가 자동으로 정리됩니다.
 - **고객 장부(CRM)** — 등록/착수/입금/판매까지 고객 단위 관리, 연락처 자동 매칭
 - **담당자** — 담당자별 진행 상황, 확인 필요 고객 자동 상단 노출
 - **설정** — 고정비/변동비/케파/담당자 명단 관리
+- **수정 기록** — 누가·언제·무엇을 바꿨는지 최근 300건 자동 기록 (우상단에 이름만 적으면 됨)
 - **내보내기** — Excel(.xlsx) / CSV 내보내기
+
+> 링크를 가진 사람은 **로그인 없이 누구나** 데이터를 보고 수정할 수 있습니다(공유 DB 연결 시).
+> 로그인이 없는 대신 각자 우상단 "내 이름" 칸에 이름을 적어두면 수정 기록에 그 이름이 남습니다(소프트 기록 — 본인이 적는 방식).
 
 ---
 
@@ -86,26 +90,27 @@ const SB_KEY = "여기에-anon-public-key";          // ← 본인 anon key
 
 ---
 
-## 3. Vercel 배포하는 법 (공유 링크 만들기)
+## 3. 배포하는 법 (공유 링크 만들기)
 
 직원들이 주소만으로 접속할 수 있게 인터넷에 올립니다.
+이 저장소는 **공개(public)** 라서 가장 간단한 GitHub Pages를 권장합니다.
 
-### 방법 A — GitHub 연동 (권장)
-1. 이 저장소를 GitHub에 올립니다.
-2. https://vercel.com 에 GitHub 계정으로 로그인
-3. **Add New → Project → 이 저장소 선택 → Import**
-4. 빌드 설정은 건드릴 필요 없습니다(정적 HTML).
-   - Framework Preset: **Other**
-   - Build/Output 설정 비워둠
-5. **Deploy** → 잠시 후 `https://gupjaengi-kpi.vercel.app` 같은 주소가 생성됩니다.
-6. 이후 GitHub에 푸시(push)할 때마다 자동으로 재배포됩니다.
+### 방법 A — GitHub Pages (권장 · 무료 · 추가 가입 없음)
+1. 이 저장소를 GitHub에 올립니다(공개 저장소).
+2. 저장소 페이지에서 **Settings → Pages**
+3. **Build and deployment → Source: Deploy from a branch**
+4. Branch: **main** / 폴더: **/ (root)** 선택 후 **Save**
+5. 1~2분 뒤 `https://<깃허브아이디>.github.io/gupjaengi-kpi/` 주소가 생성됩니다.
+6. 이후 GitHub에 푸시(push)할 때마다 자동 재배포됩니다.
 
-### 방법 B — Vercel CLI
-```powershell
-npm i -g vercel
-vercel        # 최초: 로그인 + 프로젝트 설정
-vercel --prod # 운영 배포
-```
+> ⚠️ GitHub Pages는 **무료 플랜에선 공개 저장소에서만** 작동합니다.
+> 코드를 비공개로 두고 싶으면 아래 Vercel을 쓰세요(비공개 저장소도 무료 배포 가능).
+
+### 방법 B — Vercel (비공개 저장소를 쓰고 싶을 때)
+1. https://vercel.com 에 GitHub 계정으로 로그인
+2. **Add New → Project → 이 저장소 Import**
+3. Framework Preset: **Other**, Build/Output 칸 비워둠 → **Deploy**
+4. `https://gupjaengi-kpi.vercel.app` 같은 주소 생성, 푸시 시 자동 재배포
 
 > Supabase `SB_URL` / `SB_KEY` 는 코드(`index.html`)에 직접 적혀 있으므로 별도 환경변수
 > 설정 없이 배포만 하면 그대로 공유 DB에 연결됩니다.
@@ -122,7 +127,8 @@ vercel --prod # 운영 배포
 | 저장소 로직 | `load()` / `save()` / `refresh()` | Supabase ↔ 로컬 저장 자동 전환, 20초 동기화 |
 | 데이터 모델 | 전역 변수 `S` | `{daily, customers, settings}` 전체 상태 객체 |
 | 집계 | `aggregate()` / `monthSlice()` | 일/주/월 단위 KPI 계산 |
-| 화면 렌더 | `renderDash/Full/Daily/CRM/Dealer/Set` | 탭별 화면 그리기 |
+| 화면 렌더 | `renderDash/Full/Daily/CRM/Dealer/Set/Log` | 탭별 화면 그리기 |
+| 수정 기록 | `logAction()` / `S.log` / `renderLog()` | 저장 시 누가·언제·무엇을 `S.log`에 적재(최근 300건), `editor` 이름은 브라우저별 보관 |
 | 내보내기 | `exportXLSX()` / `exportCSV()` | Excel / CSV 파일 생성 |
 
 ### 데이터는 어디에 저장되나?
