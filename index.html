@@ -244,6 +244,7 @@
       <div style="border-top:1px dashed var(--line);margin-top:14px;padding-top:14px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
           <b style="font-size:14px">월별 조정</b>
+          <span style="font-size:11px;color:var(--muted)">변동비와 같은 달 연동</span>
           <select id="fxMonth" style="max-width:150px"></select>
           <span id="fxStatus" style="font-size:12px"></span>
           <button class="btn" id="fxRevert" style="display:none">↩ 기본으로 되돌리기</button>
@@ -810,31 +811,30 @@ function renderFixedList(){
   $("fixedList").querySelectorAll("[data-d]").forEach(b=>b.onclick=async()=>{cs.splice(+b.dataset.d,1);await save("고정비 삭제");renderFixedList();renderDash();});
   renderFixedMonth();
 }
-let fxMonthSel=today().slice(0,7);
 function ensureFxOverride(mk){const fb=S.settings.fixedByMonth=S.settings.fixedByMonth||{};if(!Array.isArray(fb[mk]))fb[mk]=(S.settings.fixedCosts||[]).map(c=>({name:c.name,amount:+c.amount||0}));return fb[mk];}
 function renderFixedMonth(){
   const fb=S.settings.fixedByMonth=S.settings.fixedByMonth||{};
   const months=allMonths();
-  if(!months.includes(fxMonthSel))fxMonthSel=today().slice(0,7);
-  $("fxMonth").innerHTML=months.map(m=>`<option value="${m}"${m===fxMonthSel?" selected":""}>${m.slice(0,4)}년 ${Number(m.slice(5,7))}월</option>`).join("");
-  $("fxMonth").onchange=()=>{fxMonthSel=$("fxMonth").value;renderFixedMonth();};
-  const has=Array.isArray(fb[fxMonthSel]);
-  const items=has?fb[fxMonthSel]:(S.settings.fixedCosts||[]);
+  if(!months.includes(setMonth))setMonth=today().slice(0,7);
+  $("fxMonth").innerHTML=months.map(m=>`<option value="${m}"${m===setMonth?" selected":""}>${m.slice(0,4)}년 ${Number(m.slice(5,7))}월</option>`).join("");
+  $("fxMonth").onchange=()=>{setMonth=$("fxMonth").value;renderFixedMonth();renderVarList();};
+  const has=Array.isArray(fb[setMonth]);
+  const items=has?fb[setMonth]:(S.settings.fixedCosts||[]);
   $("fxStatus").innerHTML=has?'<span style="color:var(--amber)">● 이 달 따로 설정됨</span>':'<span style="color:var(--muted)">기본 고정비 적용중</span>';
   $("fxRevert").style.display=has?"":"none";
   $("fxMonthList").innerHTML=COST_HDR+(items.length?items.map(costRow).join(""):`<div style="padding:14px;text-align:center;color:var(--muted)">항목이 없어요. ＋로 추가하세요.</div>`);
   $("fxMonthSum").textContent=fmt(items.reduce((s,c)=>s+(+c.amount||0),0));
-  $("fxMonthList").querySelectorAll("[data-n]").forEach(inp=>inp.onchange=async()=>{const a=ensureFxOverride(fxMonthSel);a[+inp.dataset.n].name=inp.value.trim();await save("월 고정비 수정 "+fxMonthSel);renderFixedMonth();renderDash();});
-  $("fxMonthList").querySelectorAll("[data-a]").forEach(inp=>bindAmt(inp,async()=>{const a=ensureFxOverride(fxMonthSel);a[+inp.dataset.a].amount=+inp.value.replace(/\D/g,"")||0;await save("월 고정비 수정 "+fxMonthSel);renderFixedMonth();renderDash();}));
-  $("fxMonthList").querySelectorAll("[data-d]").forEach(b=>b.onclick=async()=>{const a=ensureFxOverride(fxMonthSel);a.splice(+b.dataset.d,1);await save("월 고정비 삭제 "+fxMonthSel);renderFixedMonth();renderDash();});
-  $("fxAddItem").onclick=async()=>{const a=ensureFxOverride(fxMonthSel);a.push({name:"",amount:0});await save("월 고정비 항목추가 "+fxMonthSel);renderFixedMonth();renderDash();};
-  $("fxRevert").onclick=async()=>{delete fb[fxMonthSel];await save("월 고정비 기본복귀 "+fxMonthSel);renderFixedMonth();renderDash();toast("기본 고정비로 되돌림");};
+  $("fxMonthList").querySelectorAll("[data-n]").forEach(inp=>inp.onchange=async()=>{const a=ensureFxOverride(setMonth);a[+inp.dataset.n].name=inp.value.trim();await save("월 고정비 수정 "+setMonth);renderFixedMonth();renderDash();});
+  $("fxMonthList").querySelectorAll("[data-a]").forEach(inp=>bindAmt(inp,async()=>{const a=ensureFxOverride(setMonth);a[+inp.dataset.a].amount=+inp.value.replace(/\D/g,"")||0;await save("월 고정비 수정 "+setMonth);renderFixedMonth();renderDash();}));
+  $("fxMonthList").querySelectorAll("[data-d]").forEach(b=>b.onclick=async()=>{const a=ensureFxOverride(setMonth);a.splice(+b.dataset.d,1);await save("월 고정비 삭제 "+setMonth);renderFixedMonth();renderDash();});
+  $("fxAddItem").onclick=async()=>{const a=ensureFxOverride(setMonth);a.push({name:"",amount:0});await save("월 고정비 항목추가 "+setMonth);renderFixedMonth();renderDash();};
+  $("fxRevert").onclick=async()=>{delete fb[setMonth];await save("월 고정비 기본복귀 "+setMonth);renderFixedMonth();renderDash();toast("기본 고정비로 되돌림");};
 }
 function renderVarList(){
   const months=allMonths();
   if(!months.includes(setMonth))setMonth=today().slice(0,7);
   $("varMonth").innerHTML=months.map(m=>`<option value="${m}"${m===setMonth?" selected":""}>${m.slice(0,4)}년 ${Number(m.slice(5,7))}월</option>`).join("");
-  $("varMonth").onchange=()=>{setMonth=$("varMonth").value;renderVarList();};
+  $("varMonth").onchange=()=>{setMonth=$("varMonth").value;renderVarList();renderFixedMonth();};
   $("copyPrevVar").onclick=async()=>{
     const pm=prevMonth(setMonth), src=varCosts(pm);
     if(!src.length){toast(Number(pm.slice(5,7))+"월 변동비가 없어요");return;}
