@@ -146,7 +146,7 @@
     <div class="sect-label">재무</div>
     <div class="kpis g5" id="kpiFin"></div>
     <div class="sect-label">마케팅 효율 · 케파</div>
-    <div class="kpis g4" id="kpiEff"></div>
+    <div class="kpis g5" id="kpiEff"></div>
 
     <div class="tabs" id="dashTabs">
       <button data-g="day" class="on">일간</button><button data-g="week">주간</button><button data-g="month">월간</button>
@@ -257,7 +257,8 @@
     <div class="card">
       <h2>가정값 <span class="tag">LTV는 장부에서 자동 계산</span></h2>
       <div class="grid g4">
-        <div class="field"><label>딜러 1인 월 케파 (상담 건)</label><input type="number" id="s_cap" min="1"></div>
+        <div class="field"><label>판매직원 1인 월 케파 (상담 건)</label><input type="number" id="s_cap" min="1"></div>
+        <div class="field"><label>센터 월 케파 (점검 건)</label><input type="number" id="s_centercap" min="1"></div>
       </div>
     </div>
     <div class="card">
@@ -383,7 +384,7 @@ function fixDefaults(){
     if(!Object.keys(d.varByMonth).length)d.varByMonth[cm]=[{name:"광고비",amount:800000},{name:"콘텐츠 제작비",amount:400000}];
   }
   delete d.costsByMonth; delete d.costs; delete d.fixed; delete d.mktg;
-  if(d.cap==null)d.cap=40; if(!d.dealers)d.dealers=["담당자1","담당자2"];
+  if(d.cap==null)d.cap=40; if(d.centerCap==null)d.centerCap=100; if(!d.dealers)d.dealers=["담당자1","담당자2"];
   S.daily=S.daily||[]; S.customers=S.customers||[];
 }
 const fixedTotal=()=>(S.settings.fixedCosts||[]).reduce((s,c)=>s+(+c.amount||0),0);
@@ -529,7 +530,9 @@ function renderDash(){
   const ratio=cac>0?ltv/cac:0;
   const D=(st.dealers||[]).length||1;
   const totalCap=D*(st.cap||0);
-  const sat=totalCap>0?m.leads/totalCap:0;
+  const salesSat=totalCap>0?m.leads/totalCap:0;            // 판매직원: 월 문의 ÷ (직원수×1인케파)
+  const centerCap=st.centerCap||0;
+  const centerSat=centerCap>0?m.depCust/centerCap:0;       // 센터: 월 입금(점검의뢰) ÷ 센터케파
   const active=S.customers.filter(c=>c.status!=="sold"&&c.status!=="cancel"&&c.status!=="hold"&&c.status!=="refund").length;
 
   const ML=Number(mk.slice(5,7))+"월";
@@ -550,7 +553,8 @@ function renderDash(){
     {l:"CAC (획득비용)",v:fmt(cac),d:"변동비 ÷ 판매건수"},
     {l:"LTV (고객가치)",v:fmt(ltv),d:"1인당 평생이익 · 재구매 "+repeatCoef.toFixed(2)+"회"},
     {l:"LTV : CAC",v:(ratio?ratio.toFixed(1):"0")+"x",cls:ratio>=3?"good":"",d:"3x↑ 건강"},
-    {l:"케파 포화도",v:pct(sat),cls:sat>=0.8?"":"good",d:`담당자 ${D}명 · 활성 ${active}명`},
+    {l:"판매직원 케파",v:pct(salesSat),cls:salesSat>=0.8?"":"good",d:`직원 ${D}명 · 월문의 ${m.leads}건`},
+    {l:"센터 케파",v:pct(centerSat),cls:centerSat>=0.8?"":"good",d:`월 점검 ${m.depCust}건 / 케파 ${centerCap}`},
   ]);
   renderCharts(); renderAgg(); renderDealer();
 }
@@ -808,12 +812,13 @@ function renderVarList(){
   $("varList").querySelectorAll("[data-d]").forEach(b=>b.onclick=async()=>{arr().splice(+b.dataset.d,1);await save("변동비 삭제");renderVarList();renderDash();});
 }
 function renderSet(){
-  const st=S.settings;$("s_cap").value=st.cap;
+  const st=S.settings;$("s_cap").value=st.cap;$("s_centercap").value=st.centerCap;
   renderFixedList(); renderVarList();
   $("dealerList").innerHTML=(st.dealers||[]).map((d,i)=>`<div class="field" style="flex-direction:row;align-items:center;gap:6px"><input value="${d}" data-di="${i}"><button class="del" data-deldealer="${i}">✕</button></div>`).join("");
   $("dealerList").querySelectorAll("input[data-di]").forEach(inp=>inp.onchange=async()=>{st.dealers[+inp.dataset.di]=inp.value.trim();await save("담당자 수정");renderDash();});
   $("dealerList").querySelectorAll("[data-deldealer]").forEach(b=>b.onclick=async()=>{st.dealers.splice(+b.dataset.deldealer,1);await save("담당자 삭제");renderSet();renderDash();});
-  $("s_cap").onchange=async()=>{st.cap=+$("s_cap").value||0;await save("케파 변경 "+st.cap);renderDash();};
+  $("s_cap").onchange=async()=>{st.cap=+$("s_cap").value||0;await save("판매직원 케파 변경 "+st.cap);renderDash();};
+  $("s_centercap").onchange=async()=>{st.centerCap=+$("s_centercap").value||0;await save("센터 케파 변경 "+st.centerCap);renderDash();};
 }
 
 /* ---------- 수정 기록 ---------- */
