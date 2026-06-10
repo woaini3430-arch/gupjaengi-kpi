@@ -245,6 +245,7 @@
 
   <!-- ============ 설정 ============ -->
   <div id="view-set" class="hide">
+    <div style="background:var(--teal-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin-bottom:14px;font-size:13px;color:var(--ink)">✏️ <b>설정은 수정하면 바로 저장돼요</b> — 칸을 고치고 다른 곳을 클릭(또는 Enter)하면 적용됩니다. 저장될 때마다 우상단에 <b style="color:var(--pos)">✓ 저장됨</b>이 잠깐 떠요. (따로 저장 버튼 없음)</div>
     <div class="card">
       <h2>기본 고정비 <span class="tag">매달 자동 적용 (임대료·인건비 등)</span></h2>
       <div id="fixedList"></div>
@@ -439,11 +440,12 @@ async function save(action){
   if(action)logAction(action);
   S.daily.sort((a,b)=>a.date<b.date?-1:1);
   if(sb){
-    try{const{error}=await sb.from("app_state").upsert({id:"main",data:S,updated_at:new Date().toISOString()});if(error)throw error;setSync(true);return;}catch(e){setSync(false);}
+    try{const{error}=await sb.from("app_state").upsert({id:"main",data:S,updated_at:new Date().toISOString()});if(error)throw error;setSync(true);flashSaved();return;}catch(e){setSync(false);}
   }
-  try{await window.storage.set(KEY,JSON.stringify(S),false);return;}catch(e){}
-  try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+  try{await window.storage.set(KEY,JSON.stringify(S),false);flashSaved();return;}catch(e){}
+  try{localStorage.setItem(KEY,JSON.stringify(S));flashSaved();}catch(e){}
 }
+function flashSaved(){const el=$("syncStatus");if(!el)return;el.textContent="✓ 저장됨";el.style.color="#15803D";clearTimeout(el._ft);el._ft=setTimeout(()=>setSync(true),1600);}
 async function refresh(){
   if(!sb)return;
   const ae=document.activeElement;
