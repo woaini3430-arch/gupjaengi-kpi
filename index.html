@@ -169,12 +169,21 @@
   <!-- ============ 일간 입력 ============ -->
   <div id="view-daily" class="hide">
     <div class="card">
-      <h2>일간 입력 <span class="tag">조회수 · 구독자만</span></h2>
+      <h2>일간 입력 <span class="tag">조회수·구독자 + 그날 입금</span></h2>
       <div class="grid g4">
         <div class="field"><label>날짜</label><input type="date" id="d_date"></div>
         <div class="field"><label>조회수 (그날)</label><input type="number" id="d_views" min="0" placeholder="0"></div>
-        <div class="field"><label>구독자 (누적)</label><input type="number" id="d_subs" min="0" placeholder="0"></div>
+        <div class="field"><label>구독자 증가 (그날)</label><input type="number" id="d_subs" placeholder="0"></div>
         <div class="field" style="justify-content:flex-end"><button class="save" id="d_save">저장하기</button></div>
+      </div>
+      <div style="border-top:1px dashed var(--line);margin-top:12px;padding-top:12px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+          <b style="font-size:14px">그날 입금</b>
+          <button class="btn" id="d_addDown">＋ 선수금 20만</button>
+          <button class="btn" id="d_addRes">＋ 예약금 5만</button>
+          <span style="font-size:12px;color:var(--muted)">담당자·전화 적으면 고객 장부에 자동 등록</span>
+        </div>
+        <div id="d_depList"></div>
       </div>
     </div>
     <div class="panel"><div class="ptitle">일별 기록</div><div class="tscroll"><table id="dailyTable"></table></div></div>
@@ -699,15 +708,36 @@ function renderDaily(){
     (r.length?r.map(x=>`<tr class="clk" data-d="${x.date}"><td>${x.date.slice(5).replace("-",".")}</td><td class="num">${num(x.views)}</td><td class="num">${num(x.subs)}</td><td class="num" style="color:${x.gain>=0?'var(--pos)':'var(--neg)'}">${x.gain>=0?"+":""}${num(x.gain)}</td><td><button class="del" data-deld="${x.date}">✕</button></td></tr>`).join("")
       :`<tr><td colspan="5"><div class="empty"><b>아직 없어요</b>그날 조회수·구독자를 넣어보세요.</div></td></tr>`)+`</tbody>`;
   $("dailyTable").querySelectorAll("[data-deld]").forEach(b=>b.onclick=async e=>{e.stopPropagation();S.daily=S.daily.filter(x=>x.date!==b.dataset.deld);await save("일간 삭제 "+b.dataset.deld);renderDaily();});
-  $("dailyTable").querySelectorAll("tr.clk").forEach(tr=>tr.onclick=()=>{const x=S.daily.find(d=>d.date===tr.dataset.d);$("d_date").value=x.date;$("d_views").value=x.views||"";$("d_subs").value=x.subs||"";window.scrollTo({top:0,behavior:"smooth"});});
+  $("dailyTable").querySelectorAll("tr.clk").forEach(tr=>tr.onclick=()=>{const x=dailyDec().find(d=>d.date===tr.dataset.d);$("d_date").value=x.date;$("d_views").value=x.views||"";$("d_subs").value=x.gain||"";window.scrollTo({top:0,behavior:"smooth"});});
+  renderDDeps();
+}
+let dDeps=[];
+function renderDDeps(){
+  const dealers=S.settings.dealers||[];
+  $("d_depList").innerHTML=dDeps.length?dDeps.map((x,i)=>`<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap"><span class="pill ${x.dep==="down"?"p-dep":"p-lead"}" style="min-width:62px;text-align:center">${x.dep==="down"?"선수20만":"예약5만"}</span><select data-dd="${i}" style="max-width:120px">${dealers.map(d=>`<option${d===x.dealer?" selected":""}>${d}</option>`).join("")}</select><input data-dp="${i}" value="${x.phone||""}" placeholder="전화번호" inputmode="numeric" style="max-width:160px"><button class="del" data-dx="${i}">✕</button></div>`).join(""):'<div style="color:var(--muted);font-size:13px;padding:4px 2px">＋ 선수금/예약금 버튼으로 그날 입금을 추가하세요.</div>';
+  $("d_depList").querySelectorAll("[data-dd]").forEach(s=>s.onchange=()=>{dDeps[+s.dataset.dd].dealer=s.value;});
+  $("d_depList").querySelectorAll("[data-dp]").forEach(inp=>inp.onchange=()=>{dDeps[+inp.dataset.dp].phone=inp.value;});
+  $("d_depList").querySelectorAll("[data-dx]").forEach(b=>b.onclick=()=>{dDeps.splice(+b.dataset.dx,1);renderDDeps();});
 }
 async function saveDaily(){
   if(!nameOK())return;
   const date=$("d_date").value;if(!date){toast("날짜를 선택하세요");return;}
   if(sampleMode){S.customers=[];S.daily=[];sampleMode=false;}
-  const o={date,views:+$("d_views").value||0,subs:+$("d_subs").value||0};
+  const gain=+$("d_subs").value||0;
+  const before=S.daily.filter(x=>x.date<date).sort((a,b)=>a.date<b.date?-1:1);
+  const prevCum=before.length?before[before.length-1].subs:0;
+  const o={date,views:+$("d_views").value||0,subs:prevCum+gain};
   const i=S.daily.findIndex(x=>x.date===date);if(i>=0)S.daily[i]=o;else S.daily.push(o);
-  await save("일간 입력 "+date);renderDaily();renderDash();toast(date+" 저장됨");$("d_views").value="";$("d_subs").value="";
+  let nDep=0;
+  dDeps.forEach(x=>{const dd=(x.phone||"").replace(/\D/g,"");if(dd.length<10)return;
+    const phone=dd.length===11?`${dd.slice(0,3)}-${dd.slice(3,7)}-${dd.slice(7)}`:x.phone;
+    let c=S.customers.find(c=>(c.phone||"").replace(/\D/g,"")===dd);
+    if(!c){c={id:"d-"+dd,reg:date,start:date,name:"",phone,payer:"",dealer:x.dealer||"",dep:x.dep,depdate:date,status:"dep",car:"",price:0,margin:0,fee:0,service:0,profit:0,checked:false};S.customers.push(c);}
+    else{c.dep=x.dep;c.depdate=date;if(x.dealer)c.dealer=x.dealer;if(c.status==="lead")c.status="dep";}
+    nDep++;});
+  await save("일간 입력 "+date+(nDep?` · 입금 ${nDep}건`:""));
+  dDeps=[];renderDDeps();renderDaily();renderDash();
+  toast(date+" 저장됨"+(nDep?` · 입금 ${nDep}건 등록`:""));$("d_views").value="";$("d_subs").value="";
 }
 
 /* ---------- 고객 ---------- */
@@ -1018,6 +1048,8 @@ function exportCSV(){
 $("nav").querySelectorAll("button").forEach(b=>b.onclick=()=>setView(b.dataset.v));
 $("dashTabs").querySelectorAll("button").forEach(b=>b.onclick=()=>{gran=b.dataset.g;$("dashTabs").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));renderCharts();renderAgg();});
 $("d_save").onclick=saveDaily;
+$("d_addDown").onclick=()=>{dDeps.push({dep:"down",dealer:(S.settings.dealers||[])[0]||"",phone:""});renderDDeps();};
+$("d_addRes").onclick=()=>{dDeps.push({dep:"res",dealer:(S.settings.dealers||[])[0]||"",phone:""});renderDDeps();};
 $("c_save").onclick=saveCust;
 $("c_cancel").onclick=clearCRMForm;
 $("c_dep").addEventListener("change",cReceived);
