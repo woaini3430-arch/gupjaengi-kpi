@@ -78,6 +78,7 @@
   .pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px}
   .p-lead{background:#EEF;color:#3949AB}.p-dep{background:var(--amber-bg);color:#8a5a18}
   .p-sold{background:#E3F4E8;color:#1B6B36}.p-cancel{background:#F1EFEA;color:#8a8475}
+  .p-hold{background:#EAE6F2;color:#6B4BA3}
   tr.clk:hover{background:#FCFBF7;cursor:pointer}
   .del{border:none;background:none;color:#c9c2b4;cursor:pointer;font-size:15px}.del:hover{color:var(--neg)}
   .empty{padding:42px 20px;text-align:center;color:var(--muted)}
@@ -194,7 +195,7 @@
           <select id="c_dep"><option value="none">없음(상담중)</option><option value="res">예약금 5만</option><option value="down">선수금 20만</option><option value="both">예약+선수 25만</option></select></div>
         <div class="field"><label>입금일</label><input type="date" id="c_depdate"></div>
         <div class="field"><label>상태</label>
-          <select id="c_status"><option value="lead">상담중</option><option value="dep">입금완료</option><option value="sold">판매완료</option><option value="cancel">취소</option></select></div>
+          <select id="c_status"><option value="lead">상담중</option><option value="dep">입금완료</option><option value="sold">판매완료</option><option value="hold">보류</option><option value="cancel">취소</option></select></div>
       </div>
       <div class="grid g6" id="saleFields" style="margin-top:12px">
         <div class="field"><label>판매일</label><input type="date" id="c_solddate"></div>
@@ -301,7 +302,7 @@
       <div class="field"><label>고객명</label><input type="text" id="m_name" placeholder="이름"></div>
       <div class="field"><label>연락처</label><input type="text" id="m_phone" placeholder="010-0000-0000"></div>
       <div class="field"><label>담당자</label><select id="m_dealer"></select></div>
-      <div class="field"><label>상태</label><select id="m_status"><option value="lead">상담중</option><option value="dep">입금완료</option><option value="sold">판매완료</option><option value="cancel">취소</option></select></div>
+      <div class="field"><label>상태</label><select id="m_status"><option value="lead">상담중</option><option value="dep">입금완료</option><option value="sold">판매완료</option><option value="hold">보류</option><option value="cancel">취소</option></select></div>
       <div class="field"><label>입금 유형</label><select id="m_dep"><option value="none">없음</option><option value="res">예약금 5만</option><option value="down">선수금 20만</option><option value="both">예약+선수 25만</option></select></div>
       <div class="field"><label>입금일 (선수금 지급일)</label><input type="date" id="m_depdate"></div>
       <div class="field" style="grid-column:1/3"><label>차종</label><input type="text" id="m_car" placeholder="예: G80"></div>
@@ -529,7 +530,7 @@ function renderDash(){
   const D=(st.dealers||[]).length||1;
   const totalCap=D*(st.cap||0);
   const sat=totalCap>0?m.leads/totalCap:0;
-  const active=S.customers.filter(c=>c.status!=="sold"&&c.status!=="cancel").length;
+  const active=S.customers.filter(c=>c.status!=="sold"&&c.status!=="cancel"&&c.status!=="hold").length;
 
   const ML=Number(mk.slice(5,7))+"월";
   card("kpiContent",[
@@ -605,7 +606,7 @@ function renderDealer(){
   const ds=S.settings.dealers||[], cap=S.settings.cap||0;
   const rows=ds.map(d=>{
     const cs=S.customers.filter(c=>c.dealer===d);
-    const active=cs.filter(c=>c.status!=="sold"&&c.status!=="cancel").length;
+    const active=cs.filter(c=>c.status!=="sold"&&c.status!=="cancel"&&c.status!=="hold").length;
     const sold=cs.filter(c=>c.status==="sold");
     const profit=sold.reduce((s,c)=>s+(c.profit||0),0);
     return{d,total:cs.length,active,sold:sold.length,profit,sat:cap>0?active/cap:0};
@@ -629,7 +630,7 @@ function renderDealerView(){
   $("dealerMonth").onchange=()=>{curMonth=$("dealerMonth").value;renderDealerView();};
   $("dealerSearch").oninput=()=>{dealerSearch=$("dealerSearch").value;renderDealerView();};
   let cs=S.customers.filter(c=>(curDealer==="전체"||c.dealer===curDealer)&&(curMonth==="all"||custMonth(c)===curMonth)&&matchSearch(c,dealerSearch));
-  const active=cs.filter(c=>c.status!=="sold"&&c.status!=="cancel");
+  const active=cs.filter(c=>c.status!=="sold"&&c.status!=="cancel"&&c.status!=="hold");
   const sold=cs.filter(c=>c.status==="sold");
   const profit=sold.reduce((s,c)=>s+(c.profit||0),0);
   const need=cs.filter(needsCheck).length;
@@ -642,14 +643,14 @@ function renderDealerView(){
     {l:"성사율",v:pct(conv),d:"판매 ÷ 담당"},
     {l:"확인 필요",v:num(need)+"명",cls:need>0?"":"good",d:"상담 3일·입금 7일 경과"},
   ]);
-  const order={lead:0,dep:1,sold:2,cancel:3}, lbl={lead:"상담중",dep:"입금완료",sold:"판매완료",cancel:"취소"};
+  const order={lead:0,dep:1,hold:2,sold:3,cancel:4}, lbl={lead:"상담중",dep:"입금완료",sold:"판매완료",hold:"보류",cancel:"취소"};
   cs=cs.slice().sort((a,b)=>{const n=(needsCheck(b)?1:0)-(needsCheck(a)?1:0);if(n)return n;if(order[a.status]!==order[b.status])return order[a.status]-order[b.status];return(b.reg||"")<(a.reg||"")?-1:1;});
   $("dealerBoard").innerHTML=`<thead><tr><th>체크</th><th>고객</th><th>연락처</th><th>담당</th><th>상태</th><th>차종</th><th>받은금액</th><th>입금일</th><th>판매이익</th><th>경과</th></tr></thead><tbody>`+
     (cs.length?cs.map(c=>{const nc=needsCheck(c);return `<tr class="clk" data-ec="${c.id}">
       <td><input type="checkbox" data-chk="${c.id}" ${c.checked?"checked":""} style="width:18px;height:18px;cursor:pointer"></td>
       <td>${nc?'<span class="flag"></span>':""}${c.name||"-"}</td>
       <td class="num">${c.phone||"-"}</td><td>${c.dealer||"-"}</td>
-      <td><span class="pill ${c.status==="sold"?"p-sold":c.status==="cancel"?"p-cancel":c.status==="dep"?"p-dep":"p-lead"}">${lbl[c.status]||"상담중"}</span></td>
+      <td><span class="pill ${c.status==="sold"?"p-sold":c.status==="cancel"?"p-cancel":c.status==="hold"?"p-hold":c.status==="dep"?"p-dep":"p-lead"}">${lbl[c.status]||"상담중"}</span></td>
       <td>${c.car||"-"}</td><td class="money">${fmt(depAmt(c.dep))}</td><td class="num">${c.depdate?c.depdate.slice(5).replace("-","."):"-"}</td><td class="profit">${c.profit?fmt(c.profit):"-"}</td>
       <td class="num" style="color:${nc?"var(--neg)":"var(--muted)"}">${daysAgo(c.reg)}일</td></tr>`;}).join("")
       :`<tr><td colspan="10"><div class="empty"><b>고객이 없어요</b>고객 장부에서 담당자를 지정해 추가하세요.</div></td></tr>`)+`</tbody>`;
@@ -694,14 +695,14 @@ function renderCRM(){
   let base=S.customers;
   if(crmMonth!=="all") base=base.filter(c=>monthOf(c)===crmMonth);
   if(crmSearch.trim()) base=base.filter(c=>matchSearch(c,crmSearch));
-  const F={all:"전체",dep:"입금·미판매",lead:"상담중",sold:"판매완료",cancel:"취소"};
+  const F={all:"전체",dep:"입금·미판매",lead:"상담중",sold:"판매완료",hold:"보류",cancel:"취소"};
   const cnt={all:base.length};
   base.forEach(c=>{const s=c.status||"lead";cnt[s]=(cnt[s]||0)+1;});
   $("crmChips").innerHTML=Object.keys(F).map(k=>`<button class="chip ${k===crmFilter?'on':''}" data-cf="${k}">${F[k]} <b style="opacity:.65;margin-left:2px">${cnt[k]||0}</b></button>`).join("");
   $("crmChips").querySelectorAll("[data-cf]").forEach(b=>b.onclick=()=>{crmFilter=b.dataset.cf;renderCRM();});
   let cs=[...base].sort((a,b)=>(b.reg||"")<(a.reg||"")?-1:1);
   if(crmFilter!=="all") cs=cs.filter(c=>(c.status||"lead")===crmFilter);
-  const badge=c=>c.status==="sold"?'<span class="pill p-sold">판매완료</span>':c.status==="cancel"?'<span class="pill p-cancel">취소</span>':c.status==="dep"?'<span class="pill p-dep">입금</span>':'<span class="pill p-lead">상담중</span>';
+  const badge=c=>c.status==="sold"?'<span class="pill p-sold">판매완료</span>':c.status==="cancel"?'<span class="pill p-cancel">취소</span>':c.status==="hold"?'<span class="pill p-hold">보류</span>':c.status==="dep"?'<span class="pill p-dep">입금</span>':'<span class="pill p-lead">상담중</span>';
   $("crmTable").innerHTML=`<thead><tr><th>등록일</th><th>연락처</th><th>입금자</th><th>담당</th><th>받은금액</th><th>상태</th><th>차종</th><th>차금액</th><th>판매금액</th><th></th></tr></thead><tbody>`+
     (cs.length?cs.map(c=>`<tr class="clk" data-id="${c.id}"><td>${(c.reg||"").slice(5).replace("-",".")}</td><td class="num">${c.phone||"-"}</td><td>${c.payer||"-"}</td><td>${c.dealer||"-"}</td><td class="money">${fmt(depAmt(c.dep))}</td><td>${badge(c)}</td><td>${c.car||"-"}</td><td class="num">${c.price?fmt(c.price):"-"}</td><td class="profit">${c.profit?fmt(c.profit):"-"}</td><td><button class="del" data-delc="${c.id}">✕</button></td></tr>`).join("")
       :`<tr><td colspan="10"><div class="empty"><b>고객이 없어요</b>위에서 고객을 추가하면 KPI에 자동 반영됩니다.</div></td></tr>`)+`</tbody>`;
@@ -916,7 +917,7 @@ function exportXLSX(){
   ws2["!cols"]=[{wch:12},{wch:10},{wch:12},{wch:10}];
   XLSX.utils.book_append_sheet(wb,ws2,"일간 원자료");
   // 3) 고객 원자료
-  const dl={none:"없음",res:"예약금",down:"선수금",both:"예약+선수"}, sl={lead:"상담중",dep:"입금완료",sold:"판매완료",cancel:"취소"};
+  const dl={none:"없음",res:"예약금",down:"선수금",both:"예약+선수"}, sl={lead:"상담중",dep:"입금완료",sold:"판매완료",hold:"보류",cancel:"취소"};
   const cHead=["등록일","착수일","고객명","연락처","입금자","담당","입금유형","입금일","받은금액","상태","판매일","차종","차금액","차마진","수수료","서비스","판매금액"];
   const cRows=[...S.customers].sort((a,b)=>(a.reg||"")<(b.reg||"")?-1:1).map(c=>[c.reg||"",c.start||"",c.name||"",c.phone||"",c.payer||"",c.dealer||"",dl[c.dep]||"없음",c.depdate||"",depAmt(c.dep),sl[c.status]||"",c.solddate||"",c.car||"",c.price||0,c.margin||0,c.fee||0,c.service||0,c.profit||0]);
   const ws3=XLSX.utils.aoa_to_sheet([cHead,...cRows]);
