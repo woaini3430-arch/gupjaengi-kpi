@@ -145,6 +145,8 @@
     <div class="kpis g4" id="kpiContent"></div>
     <div class="sect-label">재무</div>
     <div class="kpis g5" id="kpiFin"></div>
+    <div class="sect-label">비용 — 카드를 누르면 항목별 내역</div>
+    <div class="kpis g2" id="kpiCost"></div>
     <div class="sect-label">마케팅 효율 · 케파</div>
     <div class="kpis g5" id="kpiEff"></div>
 
@@ -336,6 +338,12 @@
         <button class="save" id="m_save">저장</button>
       </div>
     </div>
+  </div>
+</div>
+<div class="modal hide" id="costModal">
+  <div class="box" style="max-width:440px">
+    <div class="mhead"><h2 id="cm_title">내역</h2><button class="x" id="cm_x">✕</button></div>
+    <div id="cm_body"></div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -568,6 +576,10 @@ function renderDash(){
     {l:ML+" 영업이익",v:fmt(opProfit),cls:opProfit>=0?"good":"",d:"판매금액 − 고정비 − 변동비"},
     {l:ML+" 영업이익률",v:pct(opMargin),cls:opMargin>=0?"good":"",d:"영업이익 ÷ 매출"},
   ]);
+  card("kpiCost",[
+    {l:ML+" 고정비",v:fmt(fixedFor(mk)),cls:"money",click:`openCostDetail('fixed','${mk}')`,d:"눌러서 항목 보기"},
+    {l:ML+" 변동비",v:fmt(varTotal(mk)),cls:"money",click:`openCostDetail('var','${mk}')`,d:"눌러서 항목 보기"},
+  ]);
   card("kpiEff",[
     {l:"CAC (획득비용)",v:fmt(cac),d:"변동비 ÷ 판매건수"},
     {l:"LTV (고객가치)",v:fmt(ltv),d:"1인당 평생이익 · 재구매 "+repeatCoef.toFixed(2)+"회"},
@@ -577,7 +589,7 @@ function renderDash(){
   ]);
   renderCharts(); renderAgg(); renderDealer();
 }
-function card(id,arr){$(id).innerHTML=arr.map(c=>`<div class="kpi ${c.cls||""}"><div class="k-label">${c.l}</div><div class="k-val">${c.v}</div><div class="k-delta">${c.d||"\u00A0"}</div></div>`).join("");}
+function card(id,arr){$(id).innerHTML=arr.map(c=>`<div class="kpi ${c.cls||""}"${c.click?` onclick="${c.click}" style="cursor:pointer"`:""}><div class="k-label">${c.l}${c.click?' <span style="color:var(--teal);font-size:10px">\u25B8\uB0B4\uC5ED</span>':''}</div><div class="k-val">${c.v}</div><div class="k-delta">${c.d||"\u00A0"}</div></div>`).join("");}
 
 function renderFull(){
   const months=allMonths().slice().sort();           // 오래된 → 최근
@@ -777,6 +789,16 @@ function openEdit(id){
   $("editModal").classList.remove("hide");
 }
 function closeEdit(){$("editModal").classList.add("hide");mEditId=null;}
+function openCostDetail(type,mk){
+  const items=type==="fixed"?fixedItems(mk):varCosts(mk);
+  const total=items.reduce((s,c)=>s+(+c.amount||0),0), nm=Number(mk.slice(5,7))+"월";
+  $("cm_title").textContent=nm+" "+(type==="fixed"?"고정비":"변동비")+" 내역";
+  const note=type==="fixed"?(Array.isArray((S.settings.fixedByMonth||{})[mk])?'<div style="font-size:12px;color:var(--amber);margin-bottom:10px">● 이 달 따로 설정됨</div>':'<div style="font-size:12px;color:var(--muted);margin-bottom:10px">기본 고정비 적용중 (매달 동일)</div>'):'';
+  const rows=items.length?items.map(c=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:10px 2px;border-bottom:1px solid var(--line)"><span>${c.name||"(이름없음)"}</span><b>${fmt(+c.amount||0)}</b></div>`).join(""):'<div style="padding:18px;text-align:center;color:var(--muted)">항목이 없어요.</div>';
+  $("cm_body").innerHTML=note+rows+`<div style="display:flex;justify-content:space-between;padding:13px 2px 2px;font-size:16px"><b>합계</b><b style="color:var(--amber)">${fmt(total)}</b></div><div style="font-size:11px;color:var(--muted);margin-top:10px">＊ 수정은 설정 → ${type==="fixed"?"고정비":"변동비"}에서</div>`;
+  $("costModal").classList.remove("hide");
+}
+function closeCostDetail(){$("costModal").classList.add("hide");}
 async function saveEdit(){
   if(!nameOK())return;
   const c=S.customers.find(x=>x.id===mEditId); if(!c){closeEdit();return;}
@@ -1001,6 +1023,7 @@ $("m_dep").addEventListener("change",mTotals);
 $("m_status").addEventListener("change",()=>{if($("m_status").value==="sold"&&!$("m_solddate").value)$("m_solddate").value=today();});
 ["m_price","m_margin","m_fee","m_service"].forEach(id=>$(id).addEventListener("input",()=>{const e=$(id),d=e.value.replace(/\D/g,"");e.value=d?(+d).toLocaleString("ko-KR"):"";mTotals();}));
 $("editModal").addEventListener("click",e=>{if(e.target.id==="editModal")closeEdit();});
+$("cm_x").onclick=closeCostDetail; $("costModal").addEventListener("click",e=>{if(e.target.id==="costModal")closeCostDetail();});
 $("kk_analyze").onclick=kkParse; $("kk_save").onclick=kkSave;
 $("c_phone").addEventListener("change",()=>{
   if(editId)return;
