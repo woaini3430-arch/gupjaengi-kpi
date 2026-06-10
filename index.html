@@ -505,6 +505,7 @@ function aggregate(g){
   depEventsBy("depdate").forEach(c=>{const o=get(keyOf(c.depdate,g));if(c.status!=="cancel")o.depCust++;o.received+=depAmt(c.dep);if(c.dep==="res"||c.dep==="both")o.res++;if(c.dep==="down"||c.dep==="both")o.down++;});
   depEventsBy("solddate").forEach(c=>{const o=get(keyOf(c.solddate,g));o.sales++;o.revenue+=c.price||0;o.profit+=c.profit||0;});
   const a=[...M.values()].sort((x,y)=>x.key<y.key?-1:1);
+  let carry=0; a.forEach(o=>{if(o.last)carry=o.subs;else o.subs=carry;}); // 일간데이터 없는 칸(입금만 있는 날)은 구독자 이어받기
   a.forEach(o=>{o.conv=o.views>0?o.depCust/o.views:0;o.label=labOf(o.key,g);});
   return a;
 }
@@ -640,7 +641,7 @@ function drawChart(svgId,data,field,color,nowId){
   const dot=pts.length?`<circle cx="${pts[pts.length-1][0].toFixed(1)}" cy="${pts[pts.length-1][1].toFixed(1)}" r="3.5" fill="${color}"/>`:"";
   svg.innerHTML=`<defs><linearGradient id="g_${svgId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".22"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${grid}<path d="${area}" fill="url(#g_${svgId})"/><path d="${line}" fill="none" stroke="${color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>${dot}`;
 }
-function renderCharts(){const a=aggregate(gran);drawChart("chartViews",a,"views","#0E7C73","viewsNow");drawChart("chartSubs",a,"subs","#15171C","subsNow");}
+function renderCharts(){const a=aggregate(gran),cd=a.filter(o=>o.last),u=cd.length?cd:a;drawChart("chartViews",u,"views","#0E7C73","viewsNow");drawChart("chartSubs",u,"subs","#15171C","subsNow");}
 function renderAgg(){
   const a=aggregate(gran).slice().reverse(), head=gran==="day"?"날짜":gran==="week"?"주":"월";
   $("aggTable").innerHTML=`<thead><tr><th>${head}</th><th>조회수</th><th>구독자</th><th>증가</th><th>입금고객</th><th>전환율</th><th>받은금액</th><th>판매</th><th>매출</th><th>판매금액</th></tr></thead><tbody>`+
