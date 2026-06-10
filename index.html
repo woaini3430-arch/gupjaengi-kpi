@@ -895,7 +895,8 @@ let kkParsed=[];
 const KK_MAP={학영:"계학영",정인:"서정인",재성:"이재성",계학영:"계학영",서정인:"서정인",이재성:"이재성"};
 const KK_PHONE=/01[0-9][\s\-.]?\d{3,4}[\s\-.]?\d{4}/;
 function kkParse(){
-  const lines=($("kk_input").value||"").split(/\r?\n/);
+  const raw=$("kk_input").value||"";
+  const lines=raw.split(/\r?\n/);
   let cur="", msgs=[], m=null;
   lines.forEach(L=>{
     const dh=L.match(/(\d{4})년\s*(\d+)월\s*(\d+)일/);
@@ -903,6 +904,10 @@ function kkParse(){
     if(/^\[[^\]]+\]\s*\[[^\]]+\]/.test(L)){m={date:cur,text:L.replace(/^\[[^\]]+\]\s*\[[^\]]+\]\s*/,"")};msgs.push(m);}
     else if(m)m.text+="\n"+L;
   });
+  // 정식 카톡 머리표가 없으면 → 빈 줄로 나눈 "간단 블록"마다 한 건으로 처리 (직접 타이핑용)
+  if(!msgs.length){
+    raw.split(/\n\s*\n/).forEach(b=>{ if(KK_PHONE.test(b))msgs.push({date:cur||today(),text:b}); });
+  }
   const out=[], seen=new Set();
   msgs.forEach(msg=>{
     const pm=(msg.text||"").match(KK_PHONE); if(!pm)return;
