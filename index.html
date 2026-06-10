@@ -463,7 +463,7 @@ function aggregate(g){
   const M=new Map();
   const get=k=>{if(!M.has(k))M.set(k,{key:k,views:0,subs:0,gain:0,last:"",depCust:0,res:0,down:0,received:0,sales:0,revenue:0,profit:0});return M.get(k);};
   dd.forEach(x=>{const o=get(keyOf(x.date,g));o.views+=x.views||0;o.gain+=x.gain;if(x.date>=o.last){o.last=x.date;o.subs=x.subs||0;}});
-  depEventsBy("depdate").forEach(c=>{const o=get(keyOf(c.depdate,g));o.depCust++;o.received+=depAmt(c.dep);if(c.dep==="res"||c.dep==="both")o.res++;if(c.dep==="down"||c.dep==="both")o.down++;});
+  depEventsBy("depdate").forEach(c=>{const o=get(keyOf(c.depdate,g));if(c.status!=="cancel")o.depCust++;o.received+=depAmt(c.dep);if(c.dep==="res"||c.dep==="both")o.res++;if(c.dep==="down"||c.dep==="both")o.down++;});
   depEventsBy("solddate").forEach(c=>{const o=get(keyOf(c.solddate,g));o.sales++;o.revenue+=c.price||0;o.profit+=c.profit||0;});
   const a=[...M.values()].sort((x,y)=>x.key<y.key?-1:1);
   a.forEach(o=>{o.conv=o.views>0?o.depCust/o.views:0;o.label=labOf(o.key,g);});
@@ -477,7 +477,7 @@ function monthSlice(mkey){
   const leads=S.customers.filter(c=>c.reg&&c.reg.slice(0,7)===mkey);
   return{
     views:sum(dd,x=>x.views), subs:dd.length?dd[dd.length-1].subs:lastSubs(), gain:sum(dd,x=>x.gain),
-    received:deps.reduce((s,c)=>s+depAmt(c.dep),0), depCust:deps.length,
+    received:deps.reduce((s,c)=>s+depAmt(c.dep),0), depCust:deps.filter(c=>c.status!=="cancel").length,
     revenue:sales.reduce((s,c)=>s+(c.price||0),0), gross:sales.reduce((s,c)=>s+(c.profit||0),0), sales:sales.length,
     leads:leads.length
   };
@@ -487,7 +487,7 @@ function lastSubs(){const dd=dailyDec();return dd.length?dd[dd.length-1].subs:0;
 /* ---------- 전환 깔때기 (전체 누적) ---------- */
 function renderFunnel(){
   const totalViews=S.daily.reduce((s,x)=>s+(x.views||0),0);
-  const paid=S.customers.filter(c=>["sold","dep","hold","cancel"].includes(c.status)).length;   // 유료전환자(예약금 받음, 환불 제외)
+  const paid=S.customers.filter(c=>["sold","dep","hold"].includes(c.status)).length;   // 유료전환자(취소·환불 제외, 보류 포함)
   const sold=S.customers.filter(c=>c.status==="sold").length;
   const convRate=totalViews>0?paid/totalViews:null;                                // 유료전환율
   const saleRate=paid>0?sold/paid:0;                                               // 판매성공율
