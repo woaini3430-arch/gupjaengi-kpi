@@ -235,19 +235,25 @@
   <!-- ============ 설정 ============ -->
   <div id="view-set" class="hide">
     <div class="card">
-      <h2>고정비 <span class="tag">기본은 매달 동일 적용 · 특정 달만 예외 가능</span></h2>
+      <h2>기본 고정비 <span class="tag">매달 자동 적용 (임대료·인건비 등)</span></h2>
       <div id="fixedList"></div>
       <div class="row-foot">
         <button class="save ghost" id="addFixed">＋ 고정비 항목 추가</button>
-        <div class="received">월 고정비 합(기본) <b id="sumFixed" style="color:var(--ink)">₩0</b></div>
+        <div class="received">기본 월 고정비 합 <b id="sumFixed" style="color:var(--ink)">₩0</b></div>
       </div>
-      <div class="row-foot" style="border-top:1px dashed var(--line);margin-top:10px;padding-top:12px;flex-wrap:wrap;gap:8px;align-items:center">
-        <span style="color:var(--muted);font-size:13px">특정 달만 다르게:</span>
-        <select id="fxExMonth" style="max-width:150px"></select>
-        <input id="fxExAmt" inputmode="numeric" placeholder="그 달 고정비 합" style="max-width:160px">
-        <button class="btn" id="fxExSet">이 달 적용</button>
+      <div style="border-top:1px dashed var(--line);margin-top:14px;padding-top:14px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <b style="font-size:14px">월별 조정</b>
+          <select id="fxMonth" style="max-width:150px"></select>
+          <span id="fxStatus" style="font-size:12px"></span>
+          <button class="btn" id="fxRevert" style="display:none">↩ 기본으로 되돌리기</button>
+        </div>
+        <div id="fxMonthList"></div>
+        <div class="row-foot">
+          <button class="save ghost" id="fxAddItem">＋ 이 달 항목 추가</button>
+          <div class="received">이 달 고정비 합 <b id="fxMonthSum" style="color:var(--ink)">₩0</b></div>
+        </div>
       </div>
-      <div id="fxExList"></div>
     </div>
     <div class="card">
       <h2>변동비 <span class="tag">달마다 따로 입력</span></h2>
@@ -393,11 +399,13 @@ function fixDefaults(){
   delete d.costsByMonth; delete d.costs; delete d.fixed; delete d.mktg;
   if(d.cap==null)d.cap=40; if(d.centerCap==null)d.centerCap=100; if(!d.dealers)d.dealers=["담당자1","담당자2"];
   if(!d.fixedByMonth)d.fixedByMonth={};
+  Object.keys(d.fixedByMonth).forEach(k=>{if(typeof d.fixedByMonth[k]==="number")d.fixedByMonth[k]=[{name:"고정비",amount:d.fixedByMonth[k]}];}); // 구버전(총액) → 항목 리스트
   S.daily=S.daily||[]; S.customers=S.customers||[];
 }
 const fixedTotal=()=>(S.settings.fixedCosts||[]).reduce((s,c)=>s+(+c.amount||0),0);
-// 월별 고정비: 그 달 예외값이 있으면 그걸, 없으면 기본 고정비 합
-const fixedFor=ym=>{const fb=S.settings.fixedByMonth||{};return (ym in fb)?(+fb[ym]||0):fixedTotal();};
+// 월별 고정비 항목: 그 달 따로 설정돼 있으면 그 리스트, 없으면 기본 고정비 항목
+const fixedItems=ym=>{const fb=S.settings.fixedByMonth||{};return Array.isArray(fb[ym])?fb[ym]:(S.settings.fixedCosts||[]);};
+const fixedFor=ym=>fixedItems(ym).reduce((s,c)=>s+(+c.amount||0),0);
 const varCosts=ym=>(S.settings.varByMonth&&S.settings.varByMonth[ym])||[];
 const varTotal=ym=>varCosts(ym).reduce((s,c)=>s+(+c.amount||0),0);
 function prevMonth(ym){const[y,m]=ym.split("-").map(Number);const d=new Date(y,m-2,1);return d.toISOString().slice(0,7);}
@@ -800,19 +808,27 @@ function renderFixedList(){
   $("fixedList").querySelectorAll("[data-n]").forEach(inp=>inp.onchange=async()=>{cs[+inp.dataset.n].name=inp.value.trim();await save();});
   $("fixedList").querySelectorAll("[data-a]").forEach(inp=>bindAmt(inp,async()=>{cs[+inp.dataset.a].amount=+inp.value.replace(/\D/g,"")||0;await save("고정비 수정");renderFixedList();renderDash();}));
   $("fixedList").querySelectorAll("[data-d]").forEach(b=>b.onclick=async()=>{cs.splice(+b.dataset.d,1);await save("고정비 삭제");renderFixedList();renderDash();});
-  // 월별 예외
+  renderFixedMonth();
+}
+let fxMonthSel=today().slice(0,7);
+function ensureFxOverride(mk){const fb=S.settings.fixedByMonth=S.settings.fixedByMonth||{};if(!Array.isArray(fb[mk]))fb[mk]=(S.settings.fixedCosts||[]).map(c=>({name:c.name,amount:+c.amount||0}));return fb[mk];}
+function renderFixedMonth(){
   const fb=S.settings.fixedByMonth=S.settings.fixedByMonth||{};
-  const sel=$("fxExMonth"); if(sel){
-    const months=allMonths();
-    sel.innerHTML=months.map(m=>`<option value="${m}">${m.slice(0,4)}년 ${Number(m.slice(5,7))}월</option>`).join("");
-    const fill=()=>{const mk=sel.value;$("fxExAmt").value=((mk in fb)?(+fb[mk]||0):fixedTotal()).toLocaleString("ko-KR");};
-    sel.onchange=fill; fill();
-    bindAmt($("fxExAmt"),null);
-    $("fxExSet").onclick=async()=>{const mk=sel.value,amt=+$("fxExAmt").value.replace(/\D/g,"")||0;fb[mk]=amt;await save("고정비 월예외 "+mk+" "+amt);renderFixedList();renderDash();toast(Number(mk.slice(5,7))+"월 고정비 "+fmt(amt)+" 적용");};
-    const keys=Object.keys(fb).sort();
-    $("fxExList").innerHTML=keys.length?`<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">`+keys.map(mk=>`<span class="pill p-dep">${mk.slice(0,4)}.${mk.slice(5,7)} = ${fmt(+fb[mk]||0)} <a href="#" data-fx="${mk}" style="margin-left:5px;color:#b4453b;text-decoration:none;font-weight:700">×</a></span>`).join("")+`</div>`:"";
-    $("fxExList").querySelectorAll("[data-fx]").forEach(a=>a.onclick=async(e)=>{e.preventDefault();delete fb[a.dataset.fx];await save("고정비 월예외 해제 "+a.dataset.fx);renderFixedList();renderDash();toast("기본 고정비로 되돌림");});
-  }
+  const months=allMonths();
+  if(!months.includes(fxMonthSel))fxMonthSel=today().slice(0,7);
+  $("fxMonth").innerHTML=months.map(m=>`<option value="${m}"${m===fxMonthSel?" selected":""}>${m.slice(0,4)}년 ${Number(m.slice(5,7))}월</option>`).join("");
+  $("fxMonth").onchange=()=>{fxMonthSel=$("fxMonth").value;renderFixedMonth();};
+  const has=Array.isArray(fb[fxMonthSel]);
+  const items=has?fb[fxMonthSel]:(S.settings.fixedCosts||[]);
+  $("fxStatus").innerHTML=has?'<span style="color:var(--amber)">● 이 달 따로 설정됨</span>':'<span style="color:var(--muted)">기본 고정비 적용중</span>';
+  $("fxRevert").style.display=has?"":"none";
+  $("fxMonthList").innerHTML=COST_HDR+(items.length?items.map(costRow).join(""):`<div style="padding:14px;text-align:center;color:var(--muted)">항목이 없어요. ＋로 추가하세요.</div>`);
+  $("fxMonthSum").textContent=fmt(items.reduce((s,c)=>s+(+c.amount||0),0));
+  $("fxMonthList").querySelectorAll("[data-n]").forEach(inp=>inp.onchange=async()=>{const a=ensureFxOverride(fxMonthSel);a[+inp.dataset.n].name=inp.value.trim();await save("월 고정비 수정 "+fxMonthSel);renderFixedMonth();renderDash();});
+  $("fxMonthList").querySelectorAll("[data-a]").forEach(inp=>bindAmt(inp,async()=>{const a=ensureFxOverride(fxMonthSel);a[+inp.dataset.a].amount=+inp.value.replace(/\D/g,"")||0;await save("월 고정비 수정 "+fxMonthSel);renderFixedMonth();renderDash();}));
+  $("fxMonthList").querySelectorAll("[data-d]").forEach(b=>b.onclick=async()=>{const a=ensureFxOverride(fxMonthSel);a.splice(+b.dataset.d,1);await save("월 고정비 삭제 "+fxMonthSel);renderFixedMonth();renderDash();});
+  $("fxAddItem").onclick=async()=>{const a=ensureFxOverride(fxMonthSel);a.push({name:"",amount:0});await save("월 고정비 항목추가 "+fxMonthSel);renderFixedMonth();renderDash();};
+  $("fxRevert").onclick=async()=>{delete fb[fxMonthSel];await save("월 고정비 기본복귀 "+fxMonthSel);renderFixedMonth();renderDash();toast("기본 고정비로 되돌림");};
 }
 function renderVarList(){
   const months=allMonths();
