@@ -161,7 +161,7 @@
 
   <!-- ============ 전체표 ============ -->
   <div id="view-full" class="hide">
-    <div class="panel"><div class="ptitle">월별 전체 KPI <span style="font-weight:600;color:var(--muted)">· 고정비는 매달 동일 적용</span></div><div class="tscroll"><table id="fullTable"></table></div></div>
+    <div class="panel"><div class="ptitle">월별 전체 KPI <span style="font-weight:600;color:var(--muted)">· 고정비 기본 동일(월별 예외 반영)</span></div><div class="tscroll"><table id="fullTable"></table></div></div>
   </div>
 
   <!-- ============ 일간 입력 ============ -->
@@ -235,12 +235,19 @@
   <!-- ============ 설정 ============ -->
   <div id="view-set" class="hide">
     <div class="card">
-      <h2>고정비 <span class="tag">한 번 적으면 매달 자동 적용 · 수정 가능</span></h2>
+      <h2>고정비 <span class="tag">기본은 매달 동일 적용 · 특정 달만 예외 가능</span></h2>
       <div id="fixedList"></div>
       <div class="row-foot">
         <button class="save ghost" id="addFixed">＋ 고정비 항목 추가</button>
-        <div class="received">월 고정비 합 <b id="sumFixed" style="color:var(--ink)">₩0</b></div>
+        <div class="received">월 고정비 합(기본) <b id="sumFixed" style="color:var(--ink)">₩0</b></div>
       </div>
+      <div class="row-foot" style="border-top:1px dashed var(--line);margin-top:10px;padding-top:12px;flex-wrap:wrap;gap:8px;align-items:center">
+        <span style="color:var(--muted);font-size:13px">특정 달만 다르게:</span>
+        <select id="fxExMonth" style="max-width:150px"></select>
+        <input id="fxExAmt" inputmode="numeric" placeholder="그 달 고정비 합" style="max-width:160px">
+        <button class="btn" id="fxExSet">이 달 적용</button>
+      </div>
+      <div id="fxExList"></div>
     </div>
     <div class="card">
       <h2>변동비 <span class="tag">달마다 따로 입력</span></h2>
@@ -385,9 +392,12 @@ function fixDefaults(){
   }
   delete d.costsByMonth; delete d.costs; delete d.fixed; delete d.mktg;
   if(d.cap==null)d.cap=40; if(d.centerCap==null)d.centerCap=100; if(!d.dealers)d.dealers=["담당자1","담당자2"];
+  if(!d.fixedByMonth)d.fixedByMonth={};
   S.daily=S.daily||[]; S.customers=S.customers||[];
 }
 const fixedTotal=()=>(S.settings.fixedCosts||[]).reduce((s,c)=>s+(+c.amount||0),0);
+// 월별 고정비: 그 달 예외값이 있으면 그걸, 없으면 기본 고정비 합
+const fixedFor=ym=>{const fb=S.settings.fixedByMonth||{};return (ym in fb)?(+fb[ym]||0):fixedTotal();};
 const varCosts=ym=>(S.settings.varByMonth&&S.settings.varByMonth[ym])||[];
 const varTotal=ym=>varCosts(ym).reduce((s,c)=>s+(+c.amount||0),0);
 function prevMonth(ym){const[y,m]=ym.split("-").map(Number);const d=new Date(y,m-2,1);return d.toISOString().slice(0,7);}
@@ -492,8 +502,8 @@ function renderFunnel(){
   const sold=S.customers.filter(c=>c.status==="sold").length;
   const convRate=totalViews>0?paid/totalViews:null;                                // 유료전환율
   const saleRate=paid>0?sold/paid:0;                                               // 판매성공율
-  const allM=allMonths(); let g=0,v=0; allM.forEach(m=>{g+=monthSlice(m).gross;v+=varTotal(m);});
-  const op=g-fixedTotal()*allM.length-v;                                           // 누적 영업이익
+  const allM=allMonths(); let g=0,v=0,fxs=0; allM.forEach(m=>{g+=monthSlice(m).gross;v+=varTotal(m);fxs+=fixedFor(m);});
+  const op=g-fxs-v;                                                                // 누적 영업이익(월별 고정비 합)
   const stages=[
     {l:"조회수 (누적)",v:num(totalViews),sub:"일간 입력 합계",c:"var(--teal)"},
     {l:"유료전환율",v:convRate==null?"–":pct(convRate),sub:paid+"명 입금 ÷ 조회수",c:"var(--amber)"},
@@ -517,7 +527,7 @@ function renderDash(){
   $("dashMonth").onchange=()=>{dashMonth=$("dashMonth").value;renderDash();};
   const mk=dashMonth, m=monthSlice(mk), st=S.settings;
   const conv=m.views>0?m.depCust/m.views:0;
-  const opProfit=m.gross-fixedTotal()-varTotal(mk);
+  const opProfit=m.gross-fixedFor(mk)-varTotal(mk);
   const opMargin=m.revenue>0?opProfit/m.revenue:0;
   const soldAll=depEventsBy("solddate");
   const buyers=new Set(); let solo=0;
@@ -562,9 +572,8 @@ function card(id,arr){$(id).innerHTML=arr.map(c=>`<div class="kpi ${c.cls||""}">
 
 function renderFull(){
   const months=allMonths().slice().sort();           // 오래된 → 최근
-  const fx=fixedTotal();
   const rows=months.map(mk=>{
-    const m=monthSlice(mk), vt=varTotal(mk), op=m.gross-fx-vt;
+    const m=monthSlice(mk), fx=fixedFor(mk), vt=varTotal(mk), op=m.gross-fx-vt;
     return{mk,views:m.views,gain:m.gain,subs:m.subs,depCust:m.depCust,
       conv:m.views>0?m.depCust/m.views:0,received:m.received,sales:m.sales,
       revenue:m.revenue,gross:m.gross,fixed:fx,vart:vt,op,
@@ -791,6 +800,19 @@ function renderFixedList(){
   $("fixedList").querySelectorAll("[data-n]").forEach(inp=>inp.onchange=async()=>{cs[+inp.dataset.n].name=inp.value.trim();await save();});
   $("fixedList").querySelectorAll("[data-a]").forEach(inp=>bindAmt(inp,async()=>{cs[+inp.dataset.a].amount=+inp.value.replace(/\D/g,"")||0;await save("고정비 수정");renderFixedList();renderDash();}));
   $("fixedList").querySelectorAll("[data-d]").forEach(b=>b.onclick=async()=>{cs.splice(+b.dataset.d,1);await save("고정비 삭제");renderFixedList();renderDash();});
+  // 월별 예외
+  const fb=S.settings.fixedByMonth=S.settings.fixedByMonth||{};
+  const sel=$("fxExMonth"); if(sel){
+    const months=allMonths();
+    sel.innerHTML=months.map(m=>`<option value="${m}">${m.slice(0,4)}년 ${Number(m.slice(5,7))}월</option>`).join("");
+    const fill=()=>{const mk=sel.value;$("fxExAmt").value=((mk in fb)?(+fb[mk]||0):fixedTotal()).toLocaleString("ko-KR");};
+    sel.onchange=fill; fill();
+    bindAmt($("fxExAmt"),null);
+    $("fxExSet").onclick=async()=>{const mk=sel.value,amt=+$("fxExAmt").value.replace(/\D/g,"")||0;fb[mk]=amt;await save("고정비 월예외 "+mk+" "+amt);renderFixedList();renderDash();toast(Number(mk.slice(5,7))+"월 고정비 "+fmt(amt)+" 적용");};
+    const keys=Object.keys(fb).sort();
+    $("fxExList").innerHTML=keys.length?`<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">`+keys.map(mk=>`<span class="pill p-dep">${mk.slice(0,4)}.${mk.slice(5,7)} = ${fmt(+fb[mk]||0)} <a href="#" data-fx="${mk}" style="margin-left:5px;color:#b4453b;text-decoration:none;font-weight:700">×</a></span>`).join("")+`</div>`:"";
+    $("fxExList").querySelectorAll("[data-fx]").forEach(a=>a.onclick=async(e)=>{e.preventDefault();delete fb[a.dataset.fx];await save("고정비 월예외 해제 "+a.dataset.fx);renderFixedList();renderDash();toast("기본 고정비로 되돌림");});
+  }
 }
 function renderVarList(){
   const months=allMonths();
@@ -906,11 +928,11 @@ function setView(v){view=v;["dash","full","daily","crm","kakao","dealer","set","
 function fmtCol(ws,c,z){const ref=XLSX.utils.decode_range(ws["!ref"]);for(let r=1;r<=ref.e.r;r++){const cell=ws[XLSX.utils.encode_cell({r,c})];if(cell&&typeof cell.v==="number")cell.z=z;}}
 function exportXLSX(){
   if(typeof XLSX==="undefined"){toast("엑셀 모듈 로딩 중 · 잠시 후 다시 눌러주세요");return;}
-  const wb=XLSX.utils.book_new(), fx=fixedTotal();
+  const wb=XLSX.utils.book_new();
   // 1) 월별 KPI
   const months=allMonths().slice().sort();
   const kHead=["월","조회수","신규구독","누적구독","입금고객","전환율","받은금액","판매건수","매출","판매금액","고정비","변동비","영업이익","영업이익률","CAC"];
-  const kRows=months.map(mk=>{const m=monthSlice(mk),vt=varTotal(mk),op=m.gross-fx-vt;
+  const kRows=months.map(mk=>{const m=monthSlice(mk),fx=fixedFor(mk),vt=varTotal(mk),op=m.gross-fx-vt;
     return[mk,m.views,m.gain,m.subs,m.depCust,m.views>0?m.depCust/m.views:0,m.received,m.sales,m.revenue,m.gross,fx,vt,op,m.revenue>0?op/m.revenue:0,m.sales>0?vt/m.sales:0];});
   const ws1=XLSX.utils.aoa_to_sheet([kHead,...kRows]);
   ws1["!cols"]=kHead.map((h,i)=>({wch:i===0?9:12}));
