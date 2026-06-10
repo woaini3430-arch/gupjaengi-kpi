@@ -257,7 +257,7 @@
     <div class="card">
       <h2>가정값 <span class="tag">LTV는 장부에서 자동 계산</span></h2>
       <div class="grid g4">
-        <div class="field"><label>판매직원 1인 월 케파 (상담 건)</label><input type="number" id="s_cap" min="1"></div>
+        <div class="field"><label>판매직원 1인 월 케파 (판매 건)</label><input type="number" id="s_cap" min="1"></div>
         <div class="field"><label>센터 월 케파 (월 판매 가능 대수)</label><input type="number" id="s_centercap" min="1"></div>
       </div>
     </div>
@@ -530,7 +530,7 @@ function renderDash(){
   const ratio=cac>0?ltv/cac:0;
   const D=(st.dealers||[]).length||1;
   const totalCap=D*(st.cap||0);
-  const salesSat=totalCap>0?m.leads/totalCap:0;            // 판매직원: 월 문의 ÷ (직원수×1인케파)
+  const salesSat=totalCap>0?m.sales/totalCap:0;            // 판매직원: 월 판매 ÷ (직원수×1인 판매케파)
   const centerCap=st.centerCap||0;
   const centerSat=centerCap>0?m.sales/centerCap:0;         // 센터: 월 판매 ÷ 센터케파(월 판매 가능 대수)
   const active=S.customers.filter(c=>c.status!=="sold"&&c.status!=="cancel"&&c.status!=="hold"&&c.status!=="refund").length;
@@ -553,7 +553,7 @@ function renderDash(){
     {l:"CAC (획득비용)",v:fmt(cac),d:"변동비 ÷ 판매건수"},
     {l:"LTV (고객가치)",v:fmt(ltv),d:"1인당 평생이익 · 재구매 "+repeatCoef.toFixed(2)+"회"},
     {l:"LTV : CAC",v:(ratio?ratio.toFixed(1):"0")+"x",cls:ratio>=3?"good":"",d:"3x↑ 건강"},
-    {l:"판매직원 케파",v:pct(salesSat),cls:salesSat>=0.8?"":"good",d:`직원 ${D}명 · 월문의 ${m.leads}건`},
+    {l:"판매직원 케파",v:pct(salesSat),cls:salesSat>=0.8?"":"good",d:`직원 ${D}명 · 월판매 ${m.sales}건`},
     {l:"센터 케파",v:pct(centerSat),cls:centerSat>=0.8?"":"good",d:`월 판매 ${m.sales}건 / 케파 ${centerCap}`},
   ]);
   renderCharts(); renderAgg(); renderDealer();
