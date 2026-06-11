@@ -146,6 +146,7 @@
     <div class="sect-label">콘텐츠 · 전환</div>
     <div class="kpis g4" id="kpiContent"></div>
     <div class="sect-label fin">재무</div>
+    <div class="fin" id="gmvCard" style="background:var(--teal-bg);border:1px solid var(--teal);border-radius:16px;padding:16px 22px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap"></div>
     <div class="kpis g5 fin" id="kpiFin"></div>
     <div class="sect-label fin">영업비용 내역 — 카드를 누르면 항목별</div>
     <div class="kpis g2 fin" id="kpiCost"></div>
@@ -595,9 +596,9 @@ function renderDash(){
     {l:ML+" 유료전환율",v:pct(conv),d:"입금고객 ÷ 조회수"},
     {l:ML+" 입금 고객",v:num(m.depCust)+"명",cls:""},
   ]);
+  $("gmvCard").innerHTML=`<div><div style="font-size:12px;color:var(--teal);font-weight:700;letter-spacing:.3px;margin-bottom:4px">${ML} GMV · 총거래액 (규모지표)</div><div style="font-family:var(--mono);font-size:30px;font-weight:800;color:var(--teal);letter-spacing:-1px;line-height:1">${fmt(m.revenue)}</div></div><div style="font-size:12px;color:var(--muted);max-width:300px;text-align:right">유튜브로 팔린 중고차 값 총합 (${m.sales}건)<br>— 내 돈 아닌 "채널 파급력" 지표</div>`;
   card("kpiFin",[
-    {l:ML+" GMV (총거래액)",v:fmt(m.revenue),cls:"money",d:"유튜브로 팔린 차값 총합 ("+m.sales+"건) · 규모지표"},
-    {l:ML+" 매출액 (Revenue)",v:fmt(m.gross),cls:"money",d:"내 몫 = 차마진+수수료"},
+    {l:ML+" 매출액 (Revenue)",v:fmt(m.gross),cls:"money",d:"내 몫 = 수수료+차마진"},
     {l:ML+" 예약금 매출",v:fmt(m.received),cls:"money",d:"예약금5만+선수금20만 입금 합"},
     {l:ML+" 영업비용",v:fmt(expense),cls:"money",d:"고정비+변동비 (아래 내역)"},
     {l:ML+" 순이익",v:fmt(opProfit),cls:opProfit>=0?"good":"",d:"매출액 − 영업비용"},
