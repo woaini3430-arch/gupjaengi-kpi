@@ -141,13 +141,13 @@
       <div class="sect-label" style="margin:0">월 선택 — 그 달의 손익·CAC가 표시됩니다</div>
       <select id="dashMonth" style="max-width:170px"></select>
     </div>
-    <div class="sect-label">전환 깔때기 — 조회수 → 유료전환 → 판매 → 영업이익 (전체 누적)</div>
+    <div class="sect-label">전환 깔때기 — 조회수 → 유료전환 → 판매 → 순이익 (전체 누적)</div>
     <div id="funnel" style="margin-bottom:16px"></div>
     <div class="sect-label">콘텐츠 · 전환</div>
     <div class="kpis g4" id="kpiContent"></div>
     <div class="sect-label fin">재무</div>
     <div class="kpis g5 fin" id="kpiFin"></div>
-    <div class="sect-label fin">비용 — 카드를 누르면 항목별 내역</div>
+    <div class="sect-label fin">영업비용 내역 — 카드를 누르면 항목별</div>
     <div class="kpis g2 fin" id="kpiCost"></div>
     <div class="sect-label fin">마케팅 효율 · 케파</div>
     <div class="kpis g5 fin" id="kpiEff"></div>
@@ -550,7 +550,7 @@ function renderFunnel(){
     {l:"조회수 (누적)",v:num(totalViews),sub:"일간 입력 합계",c:"var(--teal)"},
     {l:"유료전환율",v:convRate==null?"–":pct(convRate),sub:paid+"명 입금 ÷ 조회수",c:"var(--amber)"},
     {l:"판매성공율",v:pct(saleRate),sub:sold+" / "+paid+"명 구매",c:"var(--pos)"},
-    {l:"영업이익 (누적)",v:isFinLocked()?"🔒":fmt(op),sub:isFinLocked()?"비공개":"판매금액 − 고정·변동비",c:op>=0?"var(--pos)":"var(--neg)"},
+    {l:"순이익 (누적)",v:isFinLocked()?"🔒":fmt(op),sub:isFinLocked()?"비공개":"매출액 − 영업비용",c:op>=0?"var(--pos)":"var(--neg)"},
   ];
   $("funnel").innerHTML=`<div style="display:flex;align-items:stretch;gap:8px;flex-wrap:wrap">`+
     stages.map((s,i)=>`<div style="flex:1;min-width:150px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px">
@@ -570,7 +570,8 @@ function renderDash(){
   const mk=dashMonth, m=monthSlice(mk), st=S.settings;
   const conv=m.views>0?m.depCust/m.views:0;
   const opProfit=m.gross-fixedFor(mk)-varTotal(mk);
-  const opMargin=m.revenue>0?opProfit/m.revenue:0;
+  const expense=fixedFor(mk)+varTotal(mk);          // 영업비용 = 고정비+변동비
+  const netMargin=m.gross>0?opProfit/m.gross:0;     // 순이익률 = 순이익 ÷ 매출액
   const soldAll=depEventsBy("solddate");
   const buyers=new Set(); let solo=0;
   soldAll.forEach(c=>{const d=digits(c.phone); if(d)buyers.add(d); else solo++;});
@@ -595,11 +596,12 @@ function renderDash(){
     {l:ML+" 입금 고객",v:num(m.depCust)+"명",cls:""},
   ]);
   card("kpiFin",[
-    {l:ML+" 매출 (차 금액)",v:fmt(m.revenue),cls:"money",d:"판매 "+m.sales+"건 차량가 합"},
+    {l:ML+" GMV (총거래액)",v:fmt(m.revenue),cls:"money",d:"유튜브로 팔린 차값 총합 ("+m.sales+"건) · 규모지표"},
+    {l:ML+" 매출액 (Revenue)",v:fmt(m.gross),cls:"money",d:"내 몫 = 차마진+수수료"},
     {l:ML+" 예약금 매출",v:fmt(m.received),cls:"money",d:"예약금5만+선수금20만 입금 합"},
-    {l:ML+" 판매금액 합",v:fmt(m.gross),cls:"money",d:"마진+수수료−서비스"},
-    {l:ML+" 영업이익",v:fmt(opProfit),cls:opProfit>=0?"good":"",d:"판매금액 − 고정비 − 변동비"},
-    {l:ML+" 영업이익률",v:pct(opMargin),cls:opMargin>=0?"good":"",d:"영업이익 ÷ 매출"},
+    {l:ML+" 영업비용",v:fmt(expense),cls:"money",d:"고정비+변동비 (아래 내역)"},
+    {l:ML+" 순이익",v:fmt(opProfit),cls:opProfit>=0?"good":"",d:"매출액 − 영업비용"},
+    {l:ML+" 순이익률",v:pct(netMargin),cls:netMargin>=0?"good":"",d:"순이익 ÷ 매출액"},
   ]);
   card("kpiCost",[
     {l:ML+" 고정비",v:fmt(fixedFor(mk)),cls:"money",click:`openCostDetail('fixed','${mk}')`,d:"눌러서 항목 보기"},
@@ -635,7 +637,7 @@ function renderFull(){
     cell(fmt(r.gross),"money")+cell(fmt(r.fixed))+cell(fmt(r.vart))+
     cell(fmt(r.op),r.op>=0?"profit":"num")+cell(pct(r.margin))+cell(fmt(r.cac))+`</tr>`;
   $("fullTable").innerHTML=`<thead><tr>
-    <th>월</th><th>조회수</th><th>신규구독</th><th>누적구독</th><th>입금고객</th><th>전환율</th><th>받은금액</th><th>판매</th><th>매출</th><th>판매금액</th><th>고정비</th><th>변동비</th><th>영업이익</th><th>이익률</th><th>CAC</th>
+    <th>월</th><th>조회수</th><th>신규구독</th><th>누적구독</th><th>입금고객</th><th>전환율</th><th>예약금매출</th><th>판매</th><th>GMV(총거래)</th><th>매출액</th><th>고정비</th><th>변동비</th><th>순이익</th><th>순이익률</th><th>CAC</th>
     </tr></thead><tbody>`+
     (rows.length?rows.map(r=>line(`${r.mk.slice(0,4)}.${r.mk.slice(5,7)}`,r)).join("")+line("합계/평균",T,true)
       :`<tr><td colspan="15"><div class="empty"><b>데이터가 없어요</b>일간 입력과 고객을 채우면 월별로 쌓입니다.</div></td></tr>`)+`</tbody>`;
@@ -657,7 +659,7 @@ function drawChart(svgId,data,field,color,nowId){
 function renderCharts(){const a=aggregate(gran),cd=a.filter(o=>o.last),u=cd.length?cd:a;drawChart("chartViews",u,"views","#0E7C73","viewsNow");drawChart("chartSubs",u,"subs","#15171C","subsNow");}
 function renderAgg(){
   const a=aggregate(gran).slice().reverse(), head=gran==="day"?"날짜":gran==="week"?"주":"월";
-  $("aggTable").innerHTML=`<thead><tr><th>${head}</th><th>조회수</th><th>구독자</th><th>증가</th><th>입금고객</th><th>전환율</th><th>받은금액</th><th>판매</th><th>매출</th><th>판매금액</th></tr></thead><tbody>`+
+  $("aggTable").innerHTML=`<thead><tr><th>${head}</th><th>조회수</th><th>구독자</th><th>증가</th><th>입금고객</th><th>전환율</th><th>예약금매출</th><th>판매</th><th>GMV</th><th>매출액</th></tr></thead><tbody>`+
     (a.length?a.map(o=>`<tr><td>${o.label}</td><td class="num">${num(o.views)}</td><td class="num">${num(o.subs)}</td><td class="num" style="color:${o.gain>=0?'var(--pos)':'var(--neg)'}">${o.gain>=0?"+":""}${num(o.gain)}</td><td class="num">${num(o.depCust)}</td><td class="num">${pct(o.conv)}</td><td class="money">${fmt(o.received)}</td><td class="num">${num(o.sales)}</td><td class="money">${fmt(o.revenue)}</td><td class="profit">${fmt(o.profit)}</td></tr>`).join("")
       :`<tr><td colspan="10"><div class="empty"><b>데이터가 없어요</b>일간 입력과 고객을 채우면 채워집니다.</div></td></tr>`)+`</tbody>`;
 }
@@ -1023,7 +1025,7 @@ function exportXLSX(){
   const wb=XLSX.utils.book_new();
   // 1) 월별 KPI
   const months=allMonths().slice().sort();
-  const kHead=["월","조회수","신규구독","누적구독","입금고객","전환율","받은금액","판매건수","매출","판매금액","고정비","변동비","영업이익","영업이익률","CAC"];
+  const kHead=["월","조회수","신규구독","누적구독","입금고객","전환율","예약금매출","판매건수","GMV(총거래액)","매출액","고정비","변동비","순이익","순이익률","CAC"];
   const kRows=months.map(mk=>{const m=monthSlice(mk),fx=fixedFor(mk),vt=varTotal(mk),op=m.gross-fx-vt;
     return[mk,m.views,m.gain,m.subs,m.depCust,m.views>0?m.depCust/m.views:0,m.received,m.sales,m.revenue,m.gross,fx,vt,op,m.revenue>0?op/m.revenue:0,m.sales>0?vt/m.sales:0];});
   const ws1=XLSX.utils.aoa_to_sheet([kHead,...kRows]);
