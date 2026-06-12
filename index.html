@@ -722,12 +722,23 @@ function renderDealerView(){
 
 /* ---------- 일간 입력 ---------- */
 function renderDaily(){
-  const r=dailyDec().slice().reverse();
-  $("dailyTable").innerHTML=`<thead><tr><th>날짜</th><th>조회수</th><th>구독자</th><th>증가</th><th></th></tr></thead><tbody>`+
-    (r.length?r.map(x=>`<tr class="clk" data-d="${x.date}"><td>${x.date.slice(5).replace("-",".")}</td><td class="num">${num(x.views)}</td><td class="num">${num(x.subs)}</td><td class="num" style="color:${x.gain>=0?'var(--pos)':'var(--neg)'}">${x.gain>=0?"+":""}${num(x.gain)}</td><td><button class="del" data-deld="${x.date}">✕</button></td></tr>`).join("")
-      :`<tr><td colspan="5"><div class="empty"><b>아직 없어요</b>그날 조회수·구독자를 넣어보세요.</div></td></tr>`)+`</tbody>`;
+  const daily=dailyDec(), dmap={}; daily.forEach(x=>dmap[x.date]=x);
+  const dep={};
+  S.customers.forEach(c=>{if(c.dep&&c.dep!=="none"&&c.depdate&&c.status!=="refund"){const o=dep[c.depdate]=dep[c.depdate]||{down:0,res:0,downAmt:0,resAmt:0};
+    if(c.dep==="down"){o.down++;o.downAmt+=200000;}else if(c.dep==="res"){o.res++;o.resAmt+=50000;}else if(c.dep==="both"){o.down++;o.res++;o.downAmt+=200000;o.resAmt+=50000;}}});
+  const dates=[...new Set([...daily.map(x=>x.date),...Object.keys(dep)])].sort().reverse();
+  const dash='<span style="color:var(--line)">-</span>';
+  const dcell=(cnt,amt)=>cnt?`${cnt}건 <span style="color:var(--muted);font-size:11px">${fmt(amt)}</span>`:dash;
+  let tD=0,tR=0,tDA=0,tRA=0;
+  const rows=dates.map(d=>{const x=dmap[d],g=dep[d]||{down:0,res:0,downAmt:0,resAmt:0};
+    tD+=g.down;tR+=g.res;tDA+=g.downAmt;tRA+=g.resAmt;
+    const gain=x?`<span style="color:${x.gain>=0?'var(--pos)':'var(--neg)'}">${x.gain>=0?"+":""}${num(x.gain)}</span>`:dash;
+    return `<tr class="clk" data-d="${d}"><td>${d.slice(5).replace("-",".")}</td><td class="num">${x?num(x.views):dash}</td><td class="num">${x?num(x.subs):dash}</td><td class="num">${gain}</td><td class="num">${dcell(g.down,g.downAmt)}</td><td class="num">${dcell(g.res,g.resAmt)}</td><td class="money">${(g.downAmt+g.resAmt)?fmt(g.downAmt+g.resAmt):dash}</td><td>${x?`<button class="del" data-deld="${d}">✕</button>`:""}</td></tr>`;}).join("");
+  const foot=dates.length?`<tfoot><tr style="font-weight:700;border-top:2px solid var(--line)"><td>합계</td><td class="num"></td><td class="num"></td><td class="num"></td><td class="num">${tD?tD+"건 "+fmt(tDA):"-"}</td><td class="num">${tR?tR+"건 "+fmt(tRA):"-"}</td><td class="money">${fmt(tDA+tRA)}</td><td></td></tr></tfoot>`:"";
+  $("dailyTable").innerHTML=`<thead><tr><th>날짜</th><th>조회수</th><th>구독자</th><th>증가</th><th>선수금</th><th>예약금</th><th>입금합</th><th></th></tr></thead><tbody>`+
+    (dates.length?rows:`<tr><td colspan="8"><div class="empty"><b>아직 없어요</b>그날 조회수·구독자·입금을 넣어보세요.</div></td></tr>`)+`</tbody>`+foot;
   $("dailyTable").querySelectorAll("[data-deld]").forEach(b=>b.onclick=async e=>{e.stopPropagation();S.daily=S.daily.filter(x=>x.date!==b.dataset.deld);await save("일간 삭제 "+b.dataset.deld);renderDaily();});
-  $("dailyTable").querySelectorAll("tr.clk").forEach(tr=>tr.onclick=()=>{const x=dailyDec().find(d=>d.date===tr.dataset.d);$("d_date").value=x.date;$("d_views").value=x.views||"";$("d_subs").value=x.gain||"";window.scrollTo({top:0,behavior:"smooth"});});
+  $("dailyTable").querySelectorAll("tr.clk").forEach(tr=>tr.onclick=()=>{const x=dmap[tr.dataset.d];$("d_date").value=tr.dataset.d;$("d_views").value=x?x.views||"":"";$("d_subs").value=x?x.gain||"":"";window.scrollTo({top:0,behavior:"smooth"});});
   renderDDeps();
 }
 let dDeps=[];
